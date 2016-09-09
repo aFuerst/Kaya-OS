@@ -2,7 +2,7 @@
 #include "../h/const.h"
 
 /*
- * Pcb.c
+ * pcb.c
  * 
  * Contains functions for:
  * 	 Process Free List
@@ -22,19 +22,28 @@
  * Authors: Alex Fuerst, Aaron Pitman
  * 
  * */
+ 
+ /*
+  * Pcb Free list is kept as a singly linked linear stack with the
+  *  head as pcbList_h
+  * 
+  * Process Queue is a doubly linked circular queue with a tail pointer
+  * 	the tails next is the queue's head
+  * 
+  * Child Tree is a double linked linear stack with a head pointer
+  * 
+  * */
 
 /* head of the pcb free list */
 HIDDEN pcb_PTR pcbList_h;
 
 /* debug function */
-HIDDEN void debugA(int a){
+HIDDEN void debugPCB(int a){
 	int i;
 	i = 0;
 		
 }
 
-
-/* DEFINITIONS */
 /************************ PCB FREE LIST DEFINITIONS *******************/
 /*  
     Insert the element pointed to by p onto the pcbFree list.
@@ -55,10 +64,11 @@ void freePcb(pcb_PTR p){
     all fields.
 */
 pcb_t *allocPcb(){
+	pcb_PTR temp;
     if(pcbList_h == NULL){
         return NULL;
     }
-    pcb_PTR temp = pcbList_h;
+    temp = pcbList_h;
     pcbList_h = pcbList_h -> p_next;
     /* set queue values to NULL */
     temp -> p_next = NULL;
@@ -225,10 +235,6 @@ void insertChild(pcb_PTR prnt, pcb_PTR p){
 		/* prnt has no children */
 		p -> p_prnt = prnt;
 		prnt -> p_child = p;
-		/*
-		p -> p_sibNext = NULL;
-		p -> p_sibPrev = NULL;
-		*/
 		return;
 	}
 	if(prnt -> p_child -> p_sibNext == NULL){
@@ -293,8 +299,6 @@ pcb_PTR outChild(pcb_PTR p){
 		/* p is at the end of child list */
 		p -> p_sibPrev -> p_sibNext = NULL;
 		p -> p_prnt = NULL;
-		p -> p_sibNext = NULL;
-		p -> p_sibPrev = NULL;
 		return p;
 	}
 	if (p -> p_sibPrev != NULL && p -> p_sibNext != NULL){ 
@@ -302,8 +306,6 @@ pcb_PTR outChild(pcb_PTR p){
 		p -> p_sibNext -> p_sibPrev = p -> p_sibPrev;
 		p -> p_sibPrev -> p_sibNext = p -> p_sibNext;
 		p -> p_prnt = NULL;
-		p -> p_sibNext = NULL;
-		p -> p_sibPrev = NULL;
 		return p;
 	}
 	/* should never get to this */

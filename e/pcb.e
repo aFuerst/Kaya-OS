@@ -5,6 +5,8 @@
 	pcb.e
 	External functions for interacting with PBC queues 
 	and children lists
+	
+	Authors: Alex Fuerst, Aaron Pitman
 */
 
 #include "../h/const.h"
