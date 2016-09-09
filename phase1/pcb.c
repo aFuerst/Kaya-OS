@@ -1,10 +1,33 @@
 #include "../h/types.h"
 #include "../h/const.h"
 
+/*
+ * Pcb.c
+ * 
+ * Contains functions for:
+ * 	 Process Free List
+ * 	   Allocate and free PCBs
+ * 	 Process Block Queues Manager
+ *     Make an empty Process queue
+ *     Check if a Process queue is empty
+ *     Insert PCBs to a Process queue
+ *     See the next PCB in a Process queue
+ * 	   Remove the first PCB from a Process queue
+ *     Remove a specific PCB from it's Process queue
+ *   Process Children Tree
+ *     Insert children into a PCB
+ *     Remove the first child from a PCB
+ *     Remove a specific PCB from it's parent
+ * 
+ * Authors: Alex Fuerst, Aaron Pitman
+ * 
+ * */
 
-static pcb_PTR pcbList_h;
+/* head of the pcb free list */
+HIDDEN pcb_PTR pcbList_h;
 
-void debugA(int a){
+/* debug function */
+HIDDEN void debugA(int a){
 	int i;
 	i = 0;
 		
@@ -34,27 +57,22 @@ void freePcb(pcb_PTR p){
 pcb_t *allocPcb(){
     if(pcbList_h == NULL){
         return NULL;
-    } else {
-        pcb_PTR temp = pcbList_h;
-        pcbList_h = pcbList_h -> p_next;
-        /* set queue and tree values to NULL */
-        temp -> p_next = NULL;
-        temp -> p_prev = NULL;
-        temp -> p_prnt = NULL;
-        temp -> p_child = NULL;
-        temp -> p_sibNext = NULL;
-        temp -> p_sibPrev = NULL;
-        /* set state values to 0 */
-        /*
-        temp -> p_s.s_asid = 0;
-		temp -> p_s.s_cause = 0;
-		temp -> p_s.s_status = 0;
-		temp -> p_s.s_pc = 0;
-		temp -> p_s.s_reg[STATEREGNUM] = 0;
-		*/
-        temp -> p_semAdd = NULL; /* not sure what proper state is */
-        return temp;
     }
+    pcb_PTR temp = pcbList_h;
+    pcbList_h = pcbList_h -> p_next;
+    /* set queue values to NULL */
+    temp -> p_next = NULL;
+    temp -> p_prev = NULL;
+        
+    /* children tree values to NULL */
+    temp -> p_prnt = NULL;
+    temp -> p_child = NULL;
+    temp -> p_sibNext = NULL;
+    temp -> p_sibPrev = NULL;
+
+	/* semaphore values to NULL */
+    temp -> p_semAdd = NULL; /* not sure what proper state is */
+    return temp;
 }
 
 /* 
@@ -70,6 +88,7 @@ void initPcbs(){
         freePcb(&procTable[i]);
     }
 }
+
 /**********************************************************************/
 
 /**************************** PROC QUEUE DEFINITIONS ******************/
@@ -90,8 +109,8 @@ int emptyProcQ(pcb_PTR tp){
 }
 
 /*  
-    Insert ProcBlk pointed to by p into process queue whose tail-pointer
-    is pointed to by tp.
+    Insert ProcBlk pointed to by p into process queue 
+    whose tail-pointer is pointed to by tp.
 */
 void insertProcQ(pcb_PTR *tp, pcb_PTR p){
 	if(emptyProcQ(*tp)) /* queue empty */
@@ -148,13 +167,10 @@ pcb_PTR outProcQ(pcb_PTR *tp, pcb_PTR p){
 	pcb_PTR temp = (*tp);
 	int i = FALSE;
 	if(emptyProcQ((*tp))){ /* tp is empty */
-		debugA(0x00003333);
 		return NULL;
 	} else if (p == NULL){ /* p not a valid pcb */
-		debugA(0x00004444);
 		return NULL;
 	} else if ( (*tp) -> p_next == (*tp) && (*tp) == p) {
-		debugA(0x00001111);
 		/* p is the tail */
 		(*tp) = mkEmptyProcQ();
 		return p;
@@ -169,7 +185,6 @@ pcb_PTR outProcQ(pcb_PTR *tp, pcb_PTR p){
 		temp = temp -> p_next;
 	}
 	if(!i){
-		debugA(0x00002222);
 		return NULL; /* p is not in the queue */
 	}
 	/* generic case */
@@ -249,20 +264,12 @@ pcb_PTR removeChild(pcb_PTR p){
 	if(p -> p_child -> p_sibNext == NULL){
 		/* only one child */
 		p -> p_child = NULL;
-		/*
-		ret -> p_sibNext = NULL;
-		ret -> p_sibPrev = NULL;
-		*/
 		p -> p_prnt = NULL;
 		return p;
 	} else {
 		/* has siblings */
 		p -> p_child = p -> p_child -> p_sibNext;
 		p -> p_child -> p_sibPrev = NULL;
-		/*
-		ret -> p_sibNext = NULL;
-		ret -> p_sibPrev = NULL;
-		*/
 		p -> p_prnt = NULL;
 		return p;		
 	}

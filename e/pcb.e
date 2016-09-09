@@ -3,19 +3,30 @@
 
 /*  
 	pcb.e
-
+	External functions for interacting with PBC queues 
+	and children lists
 */
 
 #include "../h/const.h"
 #include "../h/types.h"
 
-/*  */
+/* 
+    Initialize the pcbFree list to contain all the elements
+    if the static array or MAXPROC ProcBlk's. This method will
+        be called only once during data structure initialization.
+*/
 extern void initPcbs();
 
-/*  */
+/* 
+    Return NULL if the pcbFree list is empty. Otherwise, remove
+    an element from the pcbFree list, provide initial values for 
+    all fields.
+*/
 extern pcb_t *allocPcb();
 
-/*  */
+/*  
+    Insert the element pointed to by p onto the pcbFree list.
+*/
 extern void freePcb(pcb_t *p);
 
 /*  
