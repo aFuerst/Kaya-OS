@@ -1,7 +1,8 @@
 /*
  * ASL.c
  * Active Semaphore List
- * the active list is stored as a singly linked list with two dummy nodes (front and back)
+ * the active list is stored as a singly linked list with two dummy
+ * nodes (front and back)
  * Contains functions for:
  *  semaphore free list
  *      allocate and free semd
@@ -17,9 +18,6 @@
 #include "../h/types.h"
 #include "../h/const.h"
 #include "../e/pcb.e"
-
-/* maximum number of semaphores is MAXPROC + 2 */
-#define MAXASL (MAXPROC + 2)
 
 void debugASL(int a){
  int i;
@@ -128,7 +126,7 @@ pcb_PTR outBlocked(pcb_PTR p){
 */
 pcb_PTR headBlocked(int *semAdd){
 	semd_t *temp = search(semAdd);
-	if(!emptyProcQ(temp -> s_next -> s_procQ)){
+	if(temp -> s_next -> s_semAdd == semAdd){
 		return headProcQ(temp -> s_next -> s_procQ);
 	}
 	return NULL;
@@ -140,7 +138,7 @@ pcb_PTR headBlocked(int *semAdd){
     This method will only be called once during data structure initialization
 */
 void initASL(){
-    static semd_t semArr[MAXASL];
+    static semd_t semArr[MAXPROC + 2];
     int i;
     semdActiveList_h = NULL;
     semdFreeList_h = NULL;
@@ -150,14 +148,14 @@ void initASL(){
 	}
     /* two extra nodes placed as dummies on the semaphore list */
 	/* initialize the active array with 2 dummy nodes */
-	semdActiveList_h = &(semArr[MAXASL - 1]);
+	semdActiveList_h = &(semArr[MAXPROC + 1]);
 	semdActiveList_h -> s_next = NULL;
     /* last node in active list */
 	semdActiveList_h -> s_semAdd = (int*)MAX_INT; 
 	semdActiveList_h -> s_procQ = NULL;
 	
-	(semArr[MAXASL - 2]).s_next = semdActiveList_h;
-	semdActiveList_h = &(semArr[MAXASL - 2]);
+	(semArr[MAXPROC]).s_next = semdActiveList_h;
+	semdActiveList_h = &(semArr[MAXPROC]);
 	semdActiveList_h -> s_semAdd = 0; /* frist node in active list */
 	semdActiveList_h -> s_procQ = NULL;
 }
@@ -197,8 +195,9 @@ HIDDEN void freeSEMD(semd_t *s){
 }
 
 /*
-	searches until it finds the parent of semAdd
-	returns a semd_t pointer to that parent
+	Searches until it finds the parent of semAdd
+	returns a semd_t pointer to that parent. If not found it returns
+	pointer to the parent of where it would be.
 */
 HIDDEN semd_t *search(int *semAdd){
 	semd_t *temp = semdActiveList_h;

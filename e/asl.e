@@ -1,6 +1,9 @@
 #ifndef asl
 #define asl
 
+#include "../h/const.h"
+#include "../h/types.h"
+
 /*
 	insert the pcb pointed to be p at the tail of the process queue
 	at semaphore semAdd and set it's semaphore address to semAdd.

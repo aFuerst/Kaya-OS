@@ -1,6 +1,8 @@
 #ifndef CONSTS
 #define CONSTS
 
+#include "../h/types.h"
+
 /*********************************************************************** 
  *
  * This header file contains utility constants & macro definitions.
@@ -17,10 +19,22 @@
 
 
 /* timer, timescale, TOD-LO and other bus regs */
-#define RAMBASEADDR	0x10000000
-#define TODLOADDR	0x1000001C
-#define INTERVALTMR	0x10000020	
+#define RAMBASEADDR		0x10000000
+#define TODLOADDR		0x1000001C
+#define INTERVALTMR		0x10000020	
 #define TIMESCALEADDR	0x10000024
+
+/* new processor state locations */
+#define SYSCALLNEWAREA 0x200003D4
+#define PBGTRAPNEWAREA 0x200002BC
+#define TBLMGMTNEWAREA 0x200001A4
+#define INTPNEWAREA    0x2000008C
+
+/* old processor state locations */
+#define SYSCALLOLDAREA 0x20000348
+#define PBGTRAPOLDAREA 0x20000230
+#define TBLMGMTOLDAREA 0x20000018
+#define INTPOLDAREA    0x20000000
 
 
 /* utility constants */
@@ -78,7 +92,7 @@
 
 /* device common COMMAND codes */
 #define RESET		0
-#define ACK		1
+#define ACK			1
 
 /* operations */
 #define	MIN(A,B)	((A) < (B) ? A : B)
@@ -89,5 +103,14 @@
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
 #define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
 
+/* SYSCALL values */
+#define CREATEPROCESS 		1
+#define TERMINATEPROCESS 	2
+#define VERHOGEN 			3
+#define PASSEREN 			4
+#define SPECTRAPVEC 		5
+#define GETCPUTIME 			6
+#define WAITCLOCK 			7
+#define WAITIO 				8
 
 #endif

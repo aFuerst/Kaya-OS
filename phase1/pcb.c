@@ -20,14 +20,14 @@
  *     Remove a specific PCB from it's parent
  * 
  * Authors: Alex Fuerst, Aaron Pitman
- * 
+ * The Structure of the "THE" - Multiprogramming System
  * */
  
  /*
   * Pcb Free list is kept as a singly linked linear stack with the
   *  head as pcbList_h
   * 
-  * Process Queue is a doubly linked circular queue with a tail pointer
+  * Process Queue's are doubly linked circular queue with a tail pointer
   * 	the tails next is the queue's head
   * 
   * Child Tree is a double linked linear stack with a head pointer
@@ -49,13 +49,8 @@ HIDDEN void debugPCB(int a){
     Insert the element pointed to by p onto the pcbFree list.
 */
 void freePcb(pcb_PTR p){
-    if (pcbList_h == NULL){
-        pcbList_h = p;
-        p -> p_next = NULL;
-    } else {
-        p -> p_next = pcbList_h;
-        pcbList_h = p;
-    }
+	p -> p_next = pcbList_h;
+    pcbList_h = p;
 }
 
 /* 
@@ -128,21 +123,15 @@ void insertProcQ(pcb_PTR *tp, pcb_PTR p){
 		*tp = p;
 		p -> p_next = p;
 		p -> p_prev = p;
+		return;
 	}
-	else if ((*tp) -> p_next == *tp) /* queue len == 1 */
-	{
-		p -> p_next = *tp;
-		p -> p_prev = *tp;
-		(*tp) -> p_next = p;
-		(*tp) -> p_prev = p;
-		*tp = p;
-	} else { /* queue len > 1 */
-		p -> p_next = (*tp) -> p_next;
-		p -> p_prev = *tp;
-		(*tp) -> p_next -> p_prev = p;
-		(*tp) -> p_next = p;
-		*tp = p;		
-	}
+	/* queue len >= 1 */
+	p -> p_next = (*tp) -> p_next;
+	p -> p_prev = *tp;
+	(*tp) -> p_next -> p_prev = p;
+	(*tp) -> p_next = p;
+	*tp = p;	
+	return;	
 }
 
 /*  
@@ -157,7 +146,7 @@ pcb_PTR removeProcQ(pcb_PTR *tp){
 		return ret = NULL;
 	} else if ((*tp) -> p_next == *tp) { /* only one item in queue */
 		ret = *tp;
-		*tp = NULL;
+		(*tp) = mkEmptyProcQ(); /* make tp an empty queue */
 		return ret;
 	} /* else */
 	/* n items in queue */
@@ -180,12 +169,11 @@ pcb_PTR outProcQ(pcb_PTR *tp, pcb_PTR p){
 		return NULL;
 	} else if (p == NULL){ /* p not a valid pcb */
 		return NULL;
-	} else if ( (*tp) -> p_next == (*tp) && (*tp) == p) {
+	} else if ((*tp) == p) {
 		/* p is the tail */
-		(*tp) = mkEmptyProcQ();
-		return p;
+		return removeProcQ(tp);
 	}
-	/* go digging */
+	/* go digging to make sure p is in tp */
 	temp = temp -> p_next;
 	while(temp != (*tp)){
 		if(temp == p){
@@ -200,10 +188,6 @@ pcb_PTR outProcQ(pcb_PTR *tp, pcb_PTR p){
 	/* generic case */
 	p -> p_prev -> p_next = p -> p_next;
 	p -> p_next -> p_prev = p -> p_prev;
-	if( p == (*tp))  /* check if removed node is the tail */
-	{
-		(*tp) = p -> p_prev;
-	}
 	return p;	
 }
 
