@@ -6,23 +6,21 @@
 
 #include "../e/asl.e"
 #include "../e/pcb.e"
+#include "../e/initial.e"
+#include "../e/interrupts.e"
+#include "../e/exceptions.e"
 #include "../e/scheduler.e"
 #include "../h/const.h"
 #include "../h/types.h"
-#include "p2test.h"
-
-void debugA(int i){
-	int q;
-	q = 0;
-}
+#include "p2test.e"
 
 /* global variables */
-int processCount, softBlockCount;
-pcb_PTR currentProcess;
+int procCount, sftBlkCount;
+pcb_PTR currProc;
 pcb_PTR readyQueue;
 
 /* does the things */
-void main(){
+int main(){
 	int i;
 	unsigned int RAMTOP;
 	state_PTR newLocation;
@@ -37,33 +35,37 @@ void main(){
 
 	/* initialize global variables */
 	readyQueue = mkEmptyProcQ();
-	currentProcess = NULL;
-	processCount = softBlockCount = 0;
+	currProc = NULL;
+	procCount = sftBlkCount = 0;
 
 	/* Initialize 4 "new" interrupt vectors */
 	/* syscall */
 	newLocation =  (state_PTR)SYSCALLNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_pc = (memaddr) 0; /* set to actual address */
-	newLocation -> s_t9 = (memaddr) 0; /* set to actual address */
+	newLocation -> s_status = ALLOFF;
+	newLocation -> s_pc = (memaddr) syscallHandler;
+	newLocation -> s_t9 = (memaddr) syscallHandler;
 
 	/* pgmtrp */
 	newLocation =  (state_PTR)PBGTRAPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_pc = (memaddr) 0;/* set to actual address */
-	newLocation -> s_t9 = (memaddr) 0; /* set to actual address */
+	newLocation -> s_status = ALLOFF;
+	newLocation -> s_pc = (memaddr) pgmTrap;
+	newLocation -> s_t9 = (memaddr) pgmTrap;
 
 	/* tlbmgmt */
 	newLocation =  (state_PTR)TBLMGMTNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_pc = (memaddr) 0;/* set to actual address */
-	newLocation -> s_t9 = (memaddr) 0; /* set to actual address */	
-
+	newLocation -> s_status = ALLOFF;	
+	newLocation -> s_pc = (memaddr) tlbManager;
+	newLocation -> s_t9 = (memaddr) tlbManager;
+	
 	/* interrupt */
 	newLocation =  (state_PTR)INTPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_pc = (memaddr) 0;/* set to actual address */
-	newLocation -> s_t9 = (memaddr) 0; /* set to actual address */
+	newLocation -> s_status = ALLOFF;	
+	newLocation -> s_pc = (memaddr) interruptHandler;
+	newLocation -> s_t9 = (memaddr) interruptHandler;
 
 	/* create a semD for each device and set to 0 */
 	int semD[DEVINTNUM * DEVPERINT];
@@ -72,14 +74,17 @@ void main(){
 	}
 
 	/* create an initial process */	
-	currentProcess = allocPcb();
-	currentProcess -> p_s.s_sp = (RAMTOP - PAGESIZE);
-	currentProcess -> p_s.s_pc = (memaddr)test;
+	currProc = allocPcb();
+	currProc -> p_s.s_sp = (RAMTOP - PAGESIZE);
+	currProc -> p_s.s_pc = (memaddr)test;
+	currProc -> p_s.s_t9 = (memaddr)test;
+	currProc -> p_s.s_status = ALLOFF; /* not sure what to set this to*/
 
 	/* insert first process into readyQ */
-	insertProcQ(&readyQueue, currentProcess);
+	insertProcQ(&readyQueue, currProc);
 
 	/* send control over to the scheduler */
+	scheduler();
 
-	return;
+	return 1;
 }

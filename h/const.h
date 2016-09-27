@@ -16,7 +16,7 @@
 #define MAXPROC			20		/* maximum number of processes */
 
 #define ROMPAGESTART	0x20000000	 /* ROM Reserved Page */
-
+#define QUANTUM 		5000
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
@@ -36,6 +36,14 @@
 #define TBLMGMTOLDAREA 0x20000018
 #define INTPOLDAREA    0x20000000
 
+/*  */
+#define IEON			0x00000004
+#define KUON			0x00000008
+#define VMON			0x02000000
+#define IEOFF			0xFFFFFFFB
+#define KUOFF			0xFFFFFFF7
+#define VMOFF			0xFCFFFFFF
+#define ALLOFF 			0x00000000
 
 /* utility constants */
 #define	TRUE			1

@@ -1,8 +1,26 @@
 /*
 	This module implements the TLB Pg
 */
+void tlbManager(){
+	
+}
+
+/*
+	Program Trap
+*/
+void pgmTrap(){
+	
+}
 
 
+/*
+ * SYSCALL
+ * 
+ * */
+ void syscallHandler(){
+	 
+}
+ 
 /*
  * SYS1
  * Create_Process

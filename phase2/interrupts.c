@@ -4,4 +4,6 @@
 	Interval Timer interrupts, conterting device interrupts into V 
 	operations on the appropriate semaphores.
 */
-
+void interruptHandler(){
+	
+}
