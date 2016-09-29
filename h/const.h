@@ -17,6 +17,7 @@
 
 #define ROMPAGESTART	0x20000000	 /* ROM Reserved Page */
 #define QUANTUM 		5000
+#define MAGICNUM		49
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
@@ -37,12 +38,12 @@
 #define INTPOLDAREA    0x20000000
 
 /*  */
-#define IEON			0x00000004
-#define KUON			0x00000008
-#define VMON			0x02000000
-#define IEOFF			0xFFFFFFFB
-#define KUOFF			0xFFFFFFF7
-#define VMOFF			0xFCFFFFFF
+#define IEON			0x00000004 /* OR to turn on interrupts */
+#define KUON			0x00000008 /* OR to set in user mode */
+#define VMON			0x02000000 /* OR to turn on virtual memory */
+#define IEOFF			0xFFFFFFFB /* AND to turn off interrupts */
+#define KUOFF			0xFFFFFFF7 /* AND to turn on kernel mode */
+#define VMOFF			0xFDFFFFFF /* AND to turn off virtual memory */
 #define ALLOFF 			0x00000000
 
 /* utility constants */

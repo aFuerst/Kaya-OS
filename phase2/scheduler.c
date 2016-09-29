@@ -5,18 +5,18 @@
 #include "/usr/local/include/umps2/umps/libumps.e"
 
 /*
-	This module implements Kaya's process scheduler and deadlock 
-	detector
-*/
+ *	This module implements Kaya's process scheduler and deadlock 
+ *	detector
+ */
 
 /*
  * 
  * scheduler maintains the following variables
-extern int procCount;
-extern int sftBlkCount;
-extern pcb_PTR currProc;
-extern pcb_PTR readyQueue;
-*/
+ *	int procCount;
+ *	int sftBlkCount;
+ *	pcb_PTR currProc;
+ *	pcb_PTR readyQueue;
+ */
 void scheduler() {
 	
 	if(!emptyProcQ(readyQueue)) {

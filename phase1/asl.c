@@ -19,11 +19,6 @@
 #include "../h/const.h"
 #include "../e/pcb.e"
 
-void debugASL(int a){
- int i;
- i = 0;
-}
-
 /* head of free semaphore list */
 HIDDEN semd_t *semdFreeList_h;
 /* head of active semaphore list */

@@ -91,4 +91,9 @@ extern pcb_PTR removeChild(pcb_PTR p);
 */
 extern pcb_PTR outChild(pcb_PTR p);
 
+/*
+	Return TRUE if pcb_PRT p has no children. Returns FALSE otherwise.
+*/ 
+extern int emptyChild(pcb_PTR p);
+
 #endif

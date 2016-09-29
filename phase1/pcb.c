@@ -37,13 +37,6 @@
 /* head of the pcb free list */
 HIDDEN pcb_PTR pcbList_h;
 
-/* debug function */
-HIDDEN void debugPCB(int a){
-	int i;
-	i = 0;
-		
-}
-
 /************************ PCB FREE LIST DEFINITIONS *******************/
 /*  
     Insert the element pointed to by p onto the pcbFree list.

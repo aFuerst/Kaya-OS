@@ -18,6 +18,7 @@
 int procCount, sftBlkCount;
 pcb_PTR currProc;
 pcb_PTR readyQueue;
+int semD[MAGICNUM];
 
 /* does the things */
 int main(){
@@ -68,17 +69,17 @@ int main(){
 	newLocation -> s_t9 = (memaddr) interruptHandler;
 
 	/* create a semD for each device and set to 0 */
-	int semD[DEVINTNUM * DEVPERINT];
-	for(i = 0; i < (DEVINTNUM * DEVPERINT); ++i){
+	for(i = 0; i < MAGICNUM; ++i){
 		semD[i] = 0;
 	}
 
 	/* create an initial process */	
 	currProc = allocPcb();
 	currProc -> p_s.s_sp = (RAMTOP - PAGESIZE);
-	currProc -> p_s.s_pc = (memaddr)test;
+	currProc -> p_s.s_pc = (memaddr)test; /* test function in p2test*/
 	currProc -> p_s.s_t9 = (memaddr)test;
-	currProc -> p_s.s_status = ALLOFF; /* not sure what to set this to*/
+	/* interrupts are on and is in kernel mode for test */
+	currProc -> p_s.s_status = ALLOFF | IEON;
 
 	/* insert first process into readyQ */
 	insertProcQ(&readyQueue, currProc);
