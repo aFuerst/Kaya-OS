@@ -13,16 +13,23 @@ extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
-void syscall1(state_t* caller);
-void syscall2();
-void syscall3();
-void syscall4();
-void syscall5();
-void syscall6();
-void syscall7();
-void syscall8();
-void sys2Helper(pcb_PTR head);
-void PassUpOrDie();
+/* local functions */
+HIDDEN void syscall1(state_t* caller);
+HIDDEN void syscall2();
+HIDDEN void syscall3(state_t* caller);
+HIDDEN void syscall4(state_t* caller);
+HIDDEN void syscall5(state_t* caller);
+HIDDEN void syscall6(state_t* caller);
+HIDDEN void syscall7(state_t* caller);
+HIDDEN void syscall8(state_t* caller);
+HIDDEN void sys2Helper(pcb_PTR head);
+HIDDEN void PassUpOrDie();
+HIDDEN void copyState(state_PTR src, state_PTR dest);
+
+void debugSys(int a, int b){
+	int i;
+	i=0;
+}
 
 /*
  *	This module implements the TLB Pg Manager
@@ -45,24 +52,34 @@ void pgmTrap(){
  */
  void syscallHandler(){
 	state_t* caller, *pgm;
-	int sysRequest = caller -> s_a0;
-	unsigned int callerStatus = caller -> s_status;
-	caller = (state_t*)SYSCALLOLDAREA; /* cpu state of caller*/
-
+	int sysRequest;
+	unsigned int callerStatus;
+	
+	caller = (state_t*) SYSCALLOLDAREA; /* cpu state of caller*/
+	sysRequest = caller -> s_a0;
+	callerStatus = caller -> s_status;	
+	
 	if(sysRequest > 0 && sysRequest < 9 && 
 		!((callerStatus & KUON) == KUON)){
 		/* syscall is 1-8 and in not kernel mode */
 		/* cause a program trap */
+		copyState(caller, (state_t*) PBGTRAPOLDAREA);
+		/*
 		pgm = (state_t*) PBGTRAPOLDAREA;
+		*/
 		/* copy state to program trap old */
+		/*
 		pgm -> s_asid = caller -> s_asid;
 		pgm -> s_status = caller -> s_status;
 		pgm -> s_pc = caller -> s_pc;
 		pgm -> s_cause = caller -> s_cause;
+		*/
 		/* copy over registers, reuse sysRequest for loop counter */
+		/*
 		for(sysRequest=0; sysRequest < STATEREGNUM; sysRequest++){
 			pgm -> s_reg[sysRequest] = caller -> s_reg[sysRequest];
 		}
+		*/
 		/* Ask mikey if there is a better way! */
 		/* set cause to privlidged instruction exception */
 		pgm -> s_cause = 10;
@@ -79,22 +96,22 @@ void pgmTrap(){
 				syscall2();
 			break;
 			case VERHOGEN:
-				syscall3();
+				syscall3(caller);
 			break;
 			case PASSEREN:
-				syscall4();
+				syscall4(caller);
 			break;
 			case SPECTRAPVEC:
-				syscall5();
+				syscall5(caller);
 			break;
 			case GETCPUTIME:
-				syscall6();
+				syscall6(caller);
 			break;
 			case WAITCLOCK:
-				syscall7();
+				syscall7(caller);
 			break;
 			case WAITIO:
-				syscall8();
+				syscall8(caller);
 			break;
 			default: /* everything else not defined */
 				PassUpOrDie();
@@ -113,10 +130,8 @@ void pgmTrap(){
  * resources (no more free PCBs) place -1 in v0, otherwise place 0 in v0
  * and return
  */
-void syscall1(state_t* caller){
+HIDDEN void syscall1(state_t* caller){
 	pcb_PTR temp = allocPcb();
-	state_t* newState;
-	int i;
 	if(temp == NULL){
 		caller -> s_v0 = -1;
 		return;
@@ -129,8 +144,10 @@ void syscall1(state_t* caller){
 	/* add to the ready queue */
 	insertProcQ(&currProc, temp);
 
+	/* copy CPU state to new process */
+	copyState(&(temp -> p_s), (state_PTR) caller -> s_a1);
+	/*	
 	newState = (state_t*) caller -> s_a1;
-	/* copy state to program trap old */
 	temp -> p_s.s_asid = newState -> s_asid;
 	temp -> p_s.s_status = newState -> s_status;
 	temp -> p_s.s_pc = newState -> s_pc;
@@ -138,7 +155,7 @@ void syscall1(state_t* caller){
 	for(i=0; i < STATEREGNUM; i++){
 		temp -> p_s.s_reg[i] = newState -> s_reg[i];
 	}
-
+	*/
 	/* set return value */
 	caller -> s_v0 = 0;
 	/* return CPU to caller */
@@ -153,24 +170,42 @@ void syscall1(state_t* caller){
  * DOES NOT complete untill ALL progeny are terminated.
  * called by placing 2 in a0 and executing SYSCALL
  */
-void syscall2(){
+HIDDEN void syscall2(){
 	if(emptyChild(currProc)){
+		/* process has no children */
+		outChild(currProc);
 		freePcb(currProc);
+		procCount--;
 	} else {
 		sys2Helper(currProc);
 	}
+	/* call scheduler */
 	scheduler();
 }
 
-void sys2Helper(pcb_PTR head){
+/*
+ * Sys3Helper
+ * 
+ * Recursively removes all the children of head
+ * Kills them if they are in a semaphore, readyQueue, or currProc
+ * frees the PCB and decrements procCount accordingly
+ */
+HIDDEN void sys2Helper(pcb_PTR head){
 	/* remove all children */
 	while(!emptyChild(head)){
 		sys2Helper(removeChild(head));
 	}
-	/* try and remove self from readyQueue */
-	outProcQ(&readyQueue, head);
-	/* try and remove self from ASL */
-	outBlocked(head);
+
+	if(head -> p_semAdd != NULL){
+		/* try and remove self from ASL */
+		outBlocked(head);
+	} else if (head == currProc) {
+		/* try and remove process from it's parent */
+		outChild(currProc);
+	} else {
+		/* try and remove self from readyQueue */
+		outProcQ(&readyQueue, head);	
+	}
 	/* free self after we have no more children */
 	freePcb(head);
 	procCount--;
@@ -182,7 +217,7 @@ void sys2Helper(pcb_PTR head){
  * Perform a V operation on a semaphore. Place the value 3 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
-void syscall3(){
+HIDDEN void syscall3(state_t* caller){
 	
 }
 
@@ -193,7 +228,7 @@ void syscall3(){
  * Perform a V operation on a semaphore. Place the value 4 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
-void syscall4(){
+HIDDEN void syscall4(state_t* caller){
 	
 }
 
@@ -202,20 +237,20 @@ void syscall4(){
  * Specify_Exception_State_Vector
  * does complicated tlb / PgmTrap / SYS/Bp things
  */
- void syscall5(){
+HIDDEN void syscall5(state_t* caller){
 	
 }
  
 
 /*
  * SYS6
- * Cet_CPU_Time
+ * Get_CPU_Time
  * Causes the processor time (in microseconds) used by the requesting
  * process to be placed/returned callers v0. This means that th nucleus
  * must record (in the ProcBlk) the amount of processor time used by 
  * each process. 
  */
- void syscall6(){
+HIDDEN void syscall6(state_t* caller){
 	
 }
 
@@ -226,7 +261,7 @@ void syscall4(){
  * semaphore. This semaphore is V'ed every 100 milliseconds 
  * automatically by the nucleus. 
  */
-void syscall7(){
+HIDDEN void syscall7(state_t* caller){
 	
 }
 
@@ -237,7 +272,7 @@ void syscall7(){
  * semaphore. This semaphore is V'ed every 100 milliseconds 
  * automatically by the nucleus. 
  */
-void syscall8(){
+HIDDEN void syscall8(state_t* caller){
 	
 }
 
@@ -245,6 +280,23 @@ void syscall8(){
  * PassUpOrDie
  * 
  */
-void PassUpOrDie(){
+HIDDEN void PassUpOrDie(){
 	
+}
+
+/* 
+ * CopyState
+ * Copies the state pointed to by src to the location pointed
+ * to be dest
+ * 
+ */
+HIDDEN void copyState(state_PTR src, state_PTR dest){
+	int i;
+	dest -> s_asid = src -> s_asid;
+	dest -> s_status = src -> s_status;
+	dest -> s_pc = src -> s_pc;
+	dest -> s_cause = src -> s_cause;
+	for(i=0; i < STATEREGNUM; i++){
+		dest -> s_reg[i] = src -> s_reg[i];
+	}
 }

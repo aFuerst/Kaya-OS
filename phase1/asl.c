@@ -29,6 +29,11 @@ HIDDEN semd_t *search(int *semAdd);
 HIDDEN void freeSEMD(semd_t *s);
 HIDDEN semd_t *allocSEMD();
 
+void debugA(int a){
+	int i;
+	i=0;
+}
+
 /*
 	insert the pcb pointed to be p at the tail of the process queue
 	at semaphore semAdd and set it's semaphore address to semAdd.
@@ -73,7 +78,7 @@ int insertBlocked(int *semAdd, pcb_PTR p){
     free list.
 */
 pcb_PTR removeBlocked(int *semAdd){
-    /* find insert location */
+    /* find remove location */
 	semd_t *parent = search(semAdd);
 	if(parent -> s_next -> s_semAdd == semAdd) {
         /* next node is where we want to remove from */
@@ -84,6 +89,7 @@ pcb_PTR removeBlocked(int *semAdd){
 			parent -> s_next = parent -> s_next -> s_next; 
 			freeSEMD(temp);
 		}
+		returnVal -> p_semAdd = NULL; /* no longer has a semAdd */
 		return returnVal;
 	}
     /* node doesn't exist, jerk */
@@ -97,7 +103,7 @@ pcb_PTR removeBlocked(int *semAdd){
     an error condition, return NULL; otherwise, return p
 */
 pcb_PTR outBlocked(pcb_PTR p){
-	    /* find insert location */
+	/* find remove location */
 	semd_t *parent = search(p -> p_semAdd);
 	if(parent -> s_next -> s_semAdd == p -> p_semAdd) {
         /* next node is where we want to remove from */
@@ -108,6 +114,7 @@ pcb_PTR outBlocked(pcb_PTR p){
 			parent -> s_next = parent -> s_next -> s_next; 
 			freeSEMD(temp);
 		}
+		returnVal -> p_semAdd = NULL; /* no longer has a semAdd */
         return returnVal;
 	}
     /* node doesn't exist, jerk */
@@ -196,6 +203,9 @@ HIDDEN void freeSEMD(semd_t *s){
 */
 HIDDEN semd_t *search(int *semAdd){
 	semd_t *temp = semdActiveList_h;
+	if(semAdd == NULL){
+		semAdd = (int*) MAX_INT;
+	}
 	while(semAdd > temp -> s_next -> s_semAdd){
         /* advance until next node is greater than search value */
 		temp = temp -> s_next;

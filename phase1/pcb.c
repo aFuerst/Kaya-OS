@@ -81,7 +81,7 @@ pcb_t *allocPcb(){
 void initPcbs(){
     static pcb_t procTable[MAXPROC];
     int i;
-    pcbList_h = NULL; /* CHANGE */
+    pcbList_h = NULL;
     for(i=0;i < MAXPROC; i++){
         freePcb(&procTable[i]);
     }

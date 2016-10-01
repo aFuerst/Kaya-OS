@@ -99,6 +99,9 @@ typedef struct pcb_t {
 
 	state_t		p_s;		/* processor state */
 	int 		*p_semAdd;	/* pointer to semaphore on  */
+	unsigned int cpu_time;
+	state_PTR pgmTrpNew, pgmTrpOld, tlbNew, tlbOld, sysNew, sysOld;
+	
 } pcb_t, *pcb_PTR;						/* which proces is blocked */
 
 /* semaphor descriptor type */
