@@ -41,28 +41,28 @@ int main(){
 
 	/* Initialize 4 "new" interrupt vectors */
 	/* syscall */
-	newLocation =  (state_PTR)SYSCALLNEWAREA;
+	newLocation =  (state_PTR) SYSCALLNEWAREA;
 	newLocation -> s_sp = RAMTOP;
 	newLocation -> s_status = ALLOFF;
 	newLocation -> s_pc = (memaddr) syscallHandler;
 	newLocation -> s_t9 = (memaddr) syscallHandler;
 
 	/* pgmtrp */
-	newLocation =  (state_PTR)PBGTRAPNEWAREA;
+	newLocation =  (state_PTR) PBGTRAPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
 	newLocation -> s_status = ALLOFF;
 	newLocation -> s_pc = (memaddr) pgmTrap;
 	newLocation -> s_t9 = (memaddr) pgmTrap;
 
 	/* tlbmgmt */
-	newLocation =  (state_PTR)TBLMGMTNEWAREA;
+	newLocation =  (state_PTR) TBLMGMTNEWAREA;
 	newLocation -> s_sp = RAMTOP;
 	newLocation -> s_status = ALLOFF;	
 	newLocation -> s_pc = (memaddr) tlbManager;
 	newLocation -> s_t9 = (memaddr) tlbManager;
 	
 	/* interrupt */
-	newLocation =  (state_PTR)INTPNEWAREA;
+	newLocation =  (state_PTR) INTPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
 	newLocation -> s_status = ALLOFF;	
 	newLocation -> s_pc = (memaddr) interruptHandler;
@@ -76,8 +76,8 @@ int main(){
 	/* create an initial process */	
 	currProc = allocPcb();
 	currProc -> p_s.s_sp = (RAMTOP - PAGESIZE);
-	currProc -> p_s.s_pc = (memaddr)test; /* test function in p2test*/
-	currProc -> p_s.s_t9 = (memaddr)test;
+	currProc -> p_s.s_pc = (memaddr) test; /* test function in p2test*/
+	currProc -> p_s.s_t9 = (memaddr) test;
 	/* interrupts are on and is in kernel mode for test */
 	currProc -> p_s.s_status = ALLOFF | IEON;
 

@@ -6,14 +6,14 @@
 #include "../e/asl.e"
 #include "/usr/local/include/umps2/umps/libumps.e"
 
-/* global variables from initial */
+/* global variables taken from initial */
 extern int procCount;
 extern int sftBlkCount;
 extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
-/* local functions */
+/* local functions used within this file */
 HIDDEN void syscall1(state_t* caller);
 HIDDEN void syscall2();
 HIDDEN void syscall3(state_t* caller);
@@ -31,6 +31,8 @@ void debugSys(int a, int b){
 	i=0;
 }
 
+/*********************** START TLB MANAGER MODULE *********************/
+
 /*
  *	This module implements the TLB Pg Manager
  */
@@ -38,6 +40,10 @@ void tlbManager(){
 	
 }
 
+/************************* END TLB MANAGER MODULE *********************/
+
+
+/********************** START PROGRAM TRAP MODULE *********************/
 /*
  *	Program Trap Handler
  */
@@ -45,6 +51,10 @@ void pgmTrap(){
 	
 }
 
+/************************ END PROGRAM TRAP MODULE *********************/
+
+
+/************************ START SYSCALL MODULE ************************/
 
 /*
  * SYSCALL Handler
@@ -80,7 +90,6 @@ void pgmTrap(){
 			pgm -> s_reg[sysRequest] = caller -> s_reg[sysRequest];
 		}
 		*/
-		/* Ask mikey if there is a better way! */
 		/* set cause to privlidged instruction exception */
 		pgm -> s_cause = 10;
 		pgmTrap();
@@ -117,6 +126,9 @@ void pgmTrap(){
 				PassUpOrDie();
 			break;
 	}
+	/* should never get here */
+	PANIC();
+	/* individual syscalls decide who to pass control to */
 }
  
 /*
@@ -134,7 +146,7 @@ HIDDEN void syscall1(state_t* caller){
 	pcb_PTR temp = allocPcb();
 	if(temp == NULL){
 		caller -> s_v0 = -1;
-		return;
+		LDST(caller); /*return CPU to caller */
 	}
 	procCount++;
 	/* make new process a child of current process */
@@ -199,12 +211,13 @@ HIDDEN void sys2Helper(pcb_PTR head){
 	if(head -> p_semAdd != NULL){
 		/* try and remove self from ASL */
 		outBlocked(head);
+		sftBlkCount--;
 	} else if (head == currProc) {
 		/* try and remove process from it's parent */
 		outChild(currProc);
 	} else {
 		/* try and remove self from readyQueue */
-		outProcQ(&readyQueue, head);	
+		outProcQ(&readyQueue, head);
 	}
 	/* free self after we have no more children */
 	freePcb(head);
@@ -214,13 +227,19 @@ HIDDEN void sys2Helper(pcb_PTR head){
 /*
  * SYS3
  * Verhogen (V)
- * Perform a V operation on a semaphore. Place the value 3 in a0 and 
+ * Perform a P operation on a semaphore. Place the value 3 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
 HIDDEN void syscall3(state_t* caller){
-	
+	int* semV = (int*) caller->s_a1;
+	*semV--;
+	if(*semV < 0){
+		insertBlocked(semV, currProc);
+		copyState(caller, &(currProc -> p_s));
+		scheduler();
+	}
+	LDST(caller);
 }
-
 
 /*
  * SYS4
@@ -229,7 +248,14 @@ HIDDEN void syscall3(state_t* caller){
  * the physical address of the semaphore to be V'ed in a1
  */
 HIDDEN void syscall4(state_t* caller){
-	
+	pcb_PTR newProc;
+	int* semV = (int*) caller->s_a1;
+	*semV++;
+	if(*semV <= 0) { 
+		newProc = removeBlocked(semV);
+		insertProcQ(&readyQueue, newProc);
+	}
+	LDST(caller);
 }
 
 /*
@@ -240,18 +266,18 @@ HIDDEN void syscall4(state_t* caller){
 HIDDEN void syscall5(state_t* caller){
 	
 }
- 
 
 /*
  * SYS6
  * Get_CPU_Time
  * Causes the processor time (in microseconds) used by the requesting
- * process to be placed/returned callers v0. This means that th nucleus
+ * process to be placed/returned callers v0. This means that the nucleus
  * must record (in the ProcBlk) the amount of processor time used by 
  * each process. 
  */
 HIDDEN void syscall6(state_t* caller){
-	
+	caller->s_v0 = currProc->cpu_time;
+	LDST(caller);
 }
 
 /*
@@ -300,3 +326,5 @@ HIDDEN void copyState(state_PTR src, state_PTR dest){
 		dest -> s_reg[i] = src -> s_reg[i];
 	}
 }
+
+/************************* END SYSCALL MODULE *************************/

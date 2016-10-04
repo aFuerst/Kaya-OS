@@ -70,6 +70,11 @@ pcb_t *allocPcb(){
 
 	/* semaphore values to NULL */
     temp -> p_semAdd = NULL; /* not sure what proper state is */
+    
+    temp -> cpu_time = 0; /* no CPU time */
+    /* sys5 exception vectors set to NULL */
+    temp -> pgmTrpNew = temp -> pgmTrpOld = temp -> tlbNew = temp -> 
+			tlbOld = temp -> sysNew = temp -> sysOld = NULL;
     return temp;
 }
 
