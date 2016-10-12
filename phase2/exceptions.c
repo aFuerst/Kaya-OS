@@ -13,6 +13,9 @@ extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
+extern unsigned int TODStarted;
+extern unsigned int currentTOD;
+
 /* local functions used within this file */
 HIDDEN void syscall1(state_t* caller);
 HIDDEN void syscall2();
@@ -26,7 +29,7 @@ HIDDEN void sys2Helper(pcb_PTR head);
 HIDDEN void PassUpOrDie();
 HIDDEN void copyState(state_PTR src, state_PTR dest);
 
-void debugSys(int a, int b){
+HIDDEN void debugSys(int a, int b){
 	int i;
 	i=0;
 }
@@ -123,7 +126,7 @@ void pgmTrap(){
 				syscall8(caller);
 			break;
 			default: /* everything else not defined */
-				PassUpOrDie();
+				PassUpOrDie(caller, SYSTRAP);
 			break;
 	}
 	/* should never get here */
@@ -145,7 +148,7 @@ void pgmTrap(){
 HIDDEN void syscall1(state_t* caller){
 	pcb_PTR temp = allocPcb();
 	if(temp == NULL){
-		caller -> s_v0 = -1;
+		caller -> s_v0 = FAILURE;
 		LDST(caller); /*return CPU to caller */
 	}
 	procCount++;
@@ -169,7 +172,7 @@ HIDDEN void syscall1(state_t* caller){
 	}
 	*/
 	/* set return value */
-	caller -> s_v0 = 0;
+	caller -> s_v0 = SUCCESS;
 	/* return CPU to caller */
 	LDST(caller);
 }
@@ -232,12 +235,14 @@ HIDDEN void sys2Helper(pcb_PTR head){
  */
 HIDDEN void syscall3(state_t* caller){
 	int* semV = (int*) caller->s_a1;
-	*semV--;
+	*semV--; /* decrement semaphore */
 	if(*semV < 0){
+		/* something already has control of the semaphore */
 		insertBlocked(semV, currProc);
 		copyState(caller, &(currProc -> p_s));
 		scheduler();
 	}
+	/* nothing had control of the sem, return control to caller */
 	LDST(caller);
 }
 
@@ -250,11 +255,14 @@ HIDDEN void syscall3(state_t* caller){
 HIDDEN void syscall4(state_t* caller){
 	pcb_PTR newProc;
 	int* semV = (int*) caller->s_a1;
-	*semV++;
-	if(*semV <= 0) { 
+	*semV++; /* increment semaphore */
+	if(*semV <= 0) {
+		/* something is waiting on the semaphore */
 		newProc = removeBlocked(semV);
+		/* add it to the ready queue */
 		insertProcQ(&readyQueue, newProc);
 	}
+	/* always return control to caller */
 	LDST(caller);
 }
 
@@ -265,6 +273,32 @@ HIDDEN void syscall4(state_t* caller){
  */
 HIDDEN void syscall5(state_t* caller){
 	
+	switch(caller->s_a1) {
+		case TLBTRAP:
+			if(currProc->tlbNew != NULL) {
+				syscall2();
+			}
+			currProc->tlbNew = (state_t *) caller->s_a3;
+			currProc->tlbOld = (state_t *) caller->s_a2;
+			break;
+			
+		case PROGTRAP:
+			if(currProc->pgmTrpNew != NULL) {
+				syscall2();
+			}
+			currProc->pgmTrpNew = (state_t *) caller->s_a3;
+			currProc->pgmTrpOld = (state_t *) caller->s_a2;
+			break;
+			
+		case SYSTRAP:
+			if(currProc->sysNew != NULL) {
+					syscall2();
+				}
+			currProc->sysNew = (state_t *) caller->s_a3;
+			currProc->sysOld = (state_t *) caller->s_a2;
+			break;
+	}
+	LDST(caller);
 }
 
 /*
@@ -276,7 +310,13 @@ HIDDEN void syscall5(state_t* caller){
  * each process. 
  */
 HIDDEN void syscall6(state_t* caller){
-	caller->s_v0 = currProc->cpu_time;
+	/* get current time, subtract from global start time */
+	STCK(currentTOD);
+	/* add that to process used time and give to process */
+	currProc->cpu_time = currProc->cpu_time + (currentTOD - TODStarted);
+	currProc->p_s.s_v0 = currProc->cpu_time;
+	
+	TODStarted = currentTOD; /* update start time */
 	LDST(caller);
 }
 
@@ -306,8 +346,32 @@ HIDDEN void syscall8(state_t* caller){
  * PassUpOrDie
  * 
  */
-HIDDEN void PassUpOrDie(){
-	
+HIDDEN void PassUpOrDie(state_t* caller, int reason){
+	/* has a sys 5 been called? */
+	switch(reason){
+		case SYSTRAP: /* syscall exception */
+			if(currProc -> sysNew != NULL){
+				/* yes a trap */
+				copyState(caller, currProc -> sysOld);
+				LDST(currProc -> sysNew);
+			}
+		break;
+		case TLBTRAP: /* TLB trap exception */
+			if(currProc -> tlbNew != NULL){
+				/* yes a trap */
+				copyState(caller, currProc -> tlbOld);
+				LDST(currProc -> tlbNew);
+			}
+		break;
+		case PROGTRAP: /* pgmTrp exception */
+			if(currProc -> pgmTrpNew != NULL){
+				/* yes a trap */
+				copyState(caller, currProc -> pgmTrpOld);
+				LDST(currProc -> pgmTrpNew);
+			}
+		break;
+	}
+	syscall2(); /* if no vector defined, kill process */
 }
 
 /* 

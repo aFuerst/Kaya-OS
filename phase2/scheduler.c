@@ -14,22 +14,26 @@
  *	pcb_PTR currProc;
  *	pcb_PTR readyQueue;
  */
+unsigned int TODStarted;
+unsigned int currentTOD;
+
 void scheduler() {
+
 	
 	if(currProc != NULL){
 		/* save how much time current process used on CPU */
-		unsigned int *time = (unsigned int *) INTERVALTMR;
-		if(*time > QUANTUM){ /* process went over QUANTUM time */
-			currProc -> cpu_time = currProc -> cpu_time + QUANTUM;
-		} else {
-			currProc -> cpu_time = currProc -> cpu_time+QUANTUM-(*time);
-		}
+		/* subtract current time from global start time to get this ^ */
+		STCK(currentTOD);
+		currProc->cpu_time = currProc->cpu_time + (currentTOD - TODStarted);
 	}
 
 	if(!emptyProcQ(readyQueue)) {
 	/* start next process in queue */
 		currProc = removeProcQ(&readyQueue);
-		LDIT(QUANTUM);
+		/* get start time */
+		STCK(TODStarted);
+		/* load QUANTUM into process timer */
+		setTIMER(QUANTUM);
 		LDST(&(currProc -> p_s));
 
 	} else {

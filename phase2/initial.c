@@ -25,7 +25,7 @@ int main(){
 	int i;
 	unsigned int RAMTOP;
 	state_PTR newLocation;
-	devregarea_t* deviceInfo = (devregarea_t *) 0x10000000;
+	devregarea_t* deviceInfo = (devregarea_t *) RAMBASEADDR;
 
 	/* calcualte RAMTOP */
 	RAMTOP = (deviceInfo -> rambase) + (deviceInfo -> ramsize);
@@ -43,28 +43,28 @@ int main(){
 	/* syscall */
 	newLocation =  (state_PTR) SYSCALLNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_status = ALLOFF;
+	newLocation -> s_status = ALLOFF | INTON;
 	newLocation -> s_pc = (memaddr) syscallHandler;
 	newLocation -> s_t9 = (memaddr) syscallHandler;
 
 	/* pgmtrp */
 	newLocation =  (state_PTR) PBGTRAPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_status = ALLOFF;
+	newLocation -> s_status = ALLOFF | INTON;
 	newLocation -> s_pc = (memaddr) pgmTrap;
 	newLocation -> s_t9 = (memaddr) pgmTrap;
 
 	/* tlbmgmt */
 	newLocation =  (state_PTR) TBLMGMTNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_status = ALLOFF;	
+	newLocation -> s_status = ALLOFF | INTON;	
 	newLocation -> s_pc = (memaddr) tlbManager;
 	newLocation -> s_t9 = (memaddr) tlbManager;
 	
 	/* interrupt */
 	newLocation =  (state_PTR) INTPNEWAREA;
 	newLocation -> s_sp = RAMTOP;
-	newLocation -> s_status = ALLOFF;	
+	newLocation -> s_status = ALLOFF | INTON;	
 	newLocation -> s_pc = (memaddr) interruptHandler;
 	newLocation -> s_t9 = (memaddr) interruptHandler;
 

@@ -17,7 +17,7 @@
 
 #define ROMPAGESTART	0x20000000	 /* ROM Reserved Page */
 #define QUANTUM 		5000
-#define MAGICNUM		49
+#define MAGICNUM		49		/* num of devices w/sem + 1 for timer*/
 
 /* timer, timescale, TOD-LO and other bus regs */
 #define RAMBASEADDR		0x10000000
@@ -37,13 +37,17 @@
 #define TBLMGMTOLDAREA 0x20000018
 #define INTPOLDAREA    0x20000000
 
-/*  */
+/* On/Off bit manipulations */
 #define IEON			0x00000004 /* OR to turn on interrupts */
 #define KUON			0x00000008 /* OR to set in user mode */
 #define VMON			0x02000000 /* OR to turn on virtual memory */
+#define INTON			0x08000000 /* OR to turn on interval timer */
+#define IMON			0x0000FF00 /* OR to turn on Interrupt Mask */
 #define IEOFF			0xFFFFFFFB /* AND to turn off interrupts */
 #define KUOFF			0xFFFFFFF7 /* AND to turn on kernel mode */
 #define VMOFF			0xFDFFFFFF /* AND to turn off virtual memory */
+#define INTOFF			0xF7FFFFFF /* AND to turn off interval timer */
+#define IMOFF			0xFFFF00FF /* AND to turn off Interrupt Mask */
 #define ALLOFF 			0x00000000
 
 /* utility constants */
@@ -53,6 +57,8 @@
 #define OFF             0
 #define HIDDEN		static
 #define EOS		'\0'
+#define SUCCESS			0
+#define FAILURE			-1
 
 #ifndef MAX_INT
 #define MAX_INT 0xEFFFFFFF
