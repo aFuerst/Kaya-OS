@@ -26,8 +26,9 @@ HIDDEN void syscall6(state_t* caller);
 HIDDEN void syscall7(state_t* caller);
 HIDDEN void syscall8(state_t* caller);
 HIDDEN void sys2Helper(pcb_PTR head);
-HIDDEN void PassUpOrDie();
-HIDDEN void copyState(state_PTR src, state_PTR dest);
+HIDDEN void PassUpOrDie(state_t* caller, int reason);
+void copyState(state_PTR src, state_PTR dest);
+
 
 HIDDEN void debugSys(int a, int b){
 	int i;
@@ -40,7 +41,8 @@ HIDDEN void debugSys(int a, int b){
  *	This module implements the TLB Pg Manager
  */
 void tlbManager(){
-	
+	state_PTR caller = (state_PTR) TBLMGMTOLDAREA;
+	PassUpOrDie(caller, TLBTRAP);	
 }
 
 /************************* END TLB MANAGER MODULE *********************/
@@ -51,7 +53,8 @@ void tlbManager(){
  *	Program Trap Handler
  */
 void pgmTrap(){
-	
+	state_PTR caller = (state_PTR) PBGTRAPOLDAREA;
+	PassUpOrDie(caller, PROGTRAP);		
 }
 
 /************************ END PROGRAM TRAP MODULE *********************/
@@ -77,22 +80,6 @@ void pgmTrap(){
 		/* syscall is 1-8 and in not kernel mode */
 		/* cause a program trap */
 		copyState(caller, (state_t*) PBGTRAPOLDAREA);
-		/*
-		pgm = (state_t*) PBGTRAPOLDAREA;
-		*/
-		/* copy state to program trap old */
-		/*
-		pgm -> s_asid = caller -> s_asid;
-		pgm -> s_status = caller -> s_status;
-		pgm -> s_pc = caller -> s_pc;
-		pgm -> s_cause = caller -> s_cause;
-		*/
-		/* copy over registers, reuse sysRequest for loop counter */
-		/*
-		for(sysRequest=0; sysRequest < STATEREGNUM; sysRequest++){
-			pgm -> s_reg[sysRequest] = caller -> s_reg[sysRequest];
-		}
-		*/
 		/* set cause to privlidged instruction exception */
 		pgm -> s_cause = 10;
 		pgmTrap();
@@ -208,6 +195,7 @@ HIDDEN void syscall2(){
 HIDDEN void sys2Helper(pcb_PTR head){
 	/* remove all children */
 	while(!emptyChild(head)){
+		/* nuke it till it pukes */
 		sys2Helper(removeChild(head));
 	}
 
@@ -230,29 +218,10 @@ HIDDEN void sys2Helper(pcb_PTR head){
 /*
  * SYS3
  * Verhogen (V)
- * Perform a P operation on a semaphore. Place the value 3 in a0 and 
+ * Perform a V operation on a semaphore. Place the value 3 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
 HIDDEN void syscall3(state_t* caller){
-	int* semV = (int*) caller->s_a1;
-	*semV--; /* decrement semaphore */
-	if(*semV < 0){
-		/* something already has control of the semaphore */
-		insertBlocked(semV, currProc);
-		copyState(caller, &(currProc -> p_s));
-		scheduler();
-	}
-	/* nothing had control of the sem, return control to caller */
-	LDST(caller);
-}
-
-/*
- * SYS4
- * Passeren (P)
- * Perform a V operation on a semaphore. Place the value 4 in a0 and 
- * the physical address of the semaphore to be V'ed in a1
- */
-HIDDEN void syscall4(state_t* caller){
 	pcb_PTR newProc;
 	int* semV = (int*) caller->s_a1;
 	*semV++; /* increment semaphore */
@@ -263,6 +232,25 @@ HIDDEN void syscall4(state_t* caller){
 		insertProcQ(&readyQueue, newProc);
 	}
 	/* always return control to caller */
+	LDST(caller);
+}
+
+/*
+ * SYS4
+ * Passeren (P)
+ * Perform a P operation on a semaphore. Place the value 4 in a0 and 
+ * the physical address of the semaphore to be V'ed in a1
+ */
+HIDDEN void syscall4(state_t* caller){
+	int* semV = (int*) caller->s_a1;
+	*semV--; /* decrement semaphore */
+	if(*semV < 0){
+		/* something already has control of the semaphore */
+		insertBlocked(semV, currProc);
+		copyState(caller, &(currProc -> p_s));
+		scheduler();
+	}
+	/* nothing had control of the sem, return control to caller */
 	LDST(caller);
 }
 
@@ -328,18 +316,52 @@ HIDDEN void syscall6(state_t* caller){
  * automatically by the nucleus. 
  */
 HIDDEN void syscall7(state_t* caller){
-	
+	/* interval timer semaphore is last in semD list */
+	int* semV = (int*) &(semD[MAGICNUM-1]);
+	*semV--; /* decrement semaphore */
+	insertBlocked(semV, currProc);
+	copyState(caller, &(currProc -> p_s));
+	LDIT(INTTIME);
+	sftBlkCount++;
+	scheduler();
 }
 
 /*
  * SYS8
  * Wait_For_IO_Device
- * Perform a V operation on the nucleus maintained pseudo-clock timer
- * semaphore. This semaphore is V'ed every 100 milliseconds 
- * automatically by the nucleus. 
  */
 HIDDEN void syscall8(state_t* caller){
+	int lineNum, deviceNum, read, index;
+	int *sem;
+	lineNum = caller -> s_a1;
+	deviceNum = caller -> s_a2;
+	read = caller -> s_a3;
+	index = 0;
 	
+	if(lineNum < 3 || lineNum > 7){
+		syscall2(); /* illegal IO wait request */
+	}
+	
+	/* compute which device */
+	if(lineNum == 7 && read == TRUE){
+		/* terminal read operation */
+		index = DEVPERINT * (lineNum - 3 + read) + deviceNum;
+	} else {
+		/* anything else */
+		index = DEVPERINT * (lineNum - 3) + deviceNum;
+	}
+	
+	sem = &(semD[index]);
+	*sem--;
+	
+	if(*sem < 0) {
+		insertBlocked(sem, currProc);
+		sftBlkCount++;
+		scheduler();
+	}
+	/* ERROR? */
+	/* EDIT */
+	LDST(caller);	
 }
 
 /*
@@ -380,7 +402,7 @@ HIDDEN void PassUpOrDie(state_t* caller, int reason){
  * to be dest
  * 
  */
-HIDDEN void copyState(state_PTR src, state_PTR dest){
+void copyState(state_PTR src, state_PTR dest){
 	int i;
 	dest -> s_asid = src -> s_asid;
 	dest -> s_status = src -> s_status;

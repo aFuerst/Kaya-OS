@@ -18,7 +18,6 @@ unsigned int TODStarted;
 unsigned int currentTOD;
 
 void scheduler() {
-
 	
 	if(currProc != NULL){
 		/* save how much time current process used on CPU */

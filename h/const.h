@@ -15,8 +15,9 @@
 #define PTEMAGICNO		0x2A
 #define MAXPROC			20		/* maximum number of processes */
 
-#define ROMPAGESTART	0x20000000	 /* ROM Reserved Page */
-#define QUANTUM 		5000
+#define ROMPAGESTART	0x20000000	 	/* ROM Reserved Page */
+#define QUANTUM 		5000			/* CPU burst time */
+#define INTTIME			1000000 		/* interval timer period */
 #define MAGICNUM		49		/* num of devices w/sem + 1 for timer*/
 
 /* timer, timescale, TOD-LO and other bus regs */
@@ -36,6 +37,8 @@
 #define PBGTRAPOLDAREA 0x20000230
 #define TBLMGMTOLDAREA 0x20000018
 #define INTPOLDAREA    0x20000000
+
+#define IPAREA			0x0000FF00
 
 /* On/Off bit manipulations */
 #define IEON			0x00000004 /* OR to turn on interrupts */

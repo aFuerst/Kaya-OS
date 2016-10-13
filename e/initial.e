@@ -9,5 +9,6 @@ extern int procCount;
 extern int sftBlkCount;
 extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
+extern int semD[MAGICNUM];
 
 #endif
