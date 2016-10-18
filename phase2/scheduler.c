@@ -17,6 +17,11 @@
 unsigned int TODStarted;
 unsigned int currentTOD;
 
+void debugSch(int a, int b, int c, int d){
+	int i;
+	i=0;
+}
+
 void scheduler() {
 	
 	if(currProc != NULL){
@@ -33,10 +38,11 @@ void scheduler() {
 		STCK(TODStarted);
 		/* load QUANTUM into process timer */
 		setTIMER(QUANTUM);
+		
 		LDST(&(currProc -> p_s));
 
 	} else {
-
+		debugSch(0x12345678, procCount, sftBlkCount, 0xffffffff);
 		/* finished all processes properly */
 		if(procCount == 0) {
 			HALT();
@@ -49,6 +55,8 @@ void scheduler() {
 
 		if(procCount > 0 && sftBlkCount > 0) {
 			/* stuff here! */
+			currProc = NULL;
+			setSTATUS((getSTATUS() | ALLOFF | IEON | IECON | IMON));
 			WAIT();
 		}
 

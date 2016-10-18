@@ -30,10 +30,11 @@ HIDDEN void PassUpOrDie(state_t* caller, int reason);
 void copyState(state_PTR src, state_PTR dest);
 
 
-HIDDEN void debugSys(int a, int b){
+HIDDEN void debugSys(int a, int b, int c, int d){
 	int i;
 	i=0;
 }
+
 
 /*********************** START TLB MANAGER MODULE *********************/
 
@@ -73,10 +74,11 @@ void pgmTrap(){
 	
 	caller = (state_t*) SYSCALLOLDAREA; /* cpu state of caller*/
 	sysRequest = caller -> s_a0;
-	callerStatus = caller -> s_status;	
+	callerStatus = caller -> s_status;
+	debugSys(0xFFFFFFFF, sysRequest, callerStatus, 0x0);
 	
-	if(sysRequest > 0 && sysRequest < 9 && 
-		!((callerStatus & KUON) == KUON)){
+	if((sysRequest > 0) && (sysRequest < 9) && 
+		((callerStatus & KUON) != ALLOFF)){
 		/* syscall is 1-8 and in not kernel mode */
 		/* cause a program trap */
 		copyState(caller, (state_t*) PBGTRAPOLDAREA);
@@ -112,7 +114,7 @@ void pgmTrap(){
 			case WAITIO:
 				syscall8(caller);
 			break;
-			default: /* everything else not defined */
+			default: /* everything else not defined here */
 				PassUpOrDie(caller, SYSTRAP);
 			break;
 	}
@@ -148,16 +150,7 @@ HIDDEN void syscall1(state_t* caller){
 
 	/* copy CPU state to new process */
 	copyState(&(temp -> p_s), (state_PTR) caller -> s_a1);
-	/*	
-	newState = (state_t*) caller -> s_a1;
-	temp -> p_s.s_asid = newState -> s_asid;
-	temp -> p_s.s_status = newState -> s_status;
-	temp -> p_s.s_pc = newState -> s_pc;
-	temp -> p_s.s_cause = newState -> s_cause;
-	for(i=0; i < STATEREGNUM; i++){
-		temp -> p_s.s_reg[i] = newState -> s_reg[i];
-	}
-	*/
+
 	/* set return value */
 	caller -> s_v0 = SUCCESS;
 	/* return CPU to caller */
@@ -173,6 +166,7 @@ HIDDEN void syscall1(state_t* caller){
  * called by placing 2 in a0 and executing SYSCALL
  */
 HIDDEN void syscall2(){
+	debugSys(0xABCDEF00, 2,2,2);
 	if(emptyChild(currProc)){
 		/* process has no children */
 		outChild(currProc);
@@ -186,7 +180,7 @@ HIDDEN void syscall2(){
 }
 
 /*
- * Sys3Helper
+ * Sys2Helper
  * 
  * Recursively removes all the children of head
  * Kills them if they are in a semaphore, readyQueue, or currProc
@@ -224,8 +218,8 @@ HIDDEN void sys2Helper(pcb_PTR head){
 HIDDEN void syscall3(state_t* caller){
 	pcb_PTR newProc;
 	int* semV = (int*) caller->s_a1;
-	*semV++; /* increment semaphore */
-	if(*semV <= 0) {
+	(*semV)++; /* increment semaphore */
+	if((*semV) <= 0) {
 		/* something is waiting on the semaphore */
 		newProc = removeBlocked(semV);
 		/* add it to the ready queue */
@@ -243,8 +237,8 @@ HIDDEN void syscall3(state_t* caller){
  */
 HIDDEN void syscall4(state_t* caller){
 	int* semV = (int*) caller->s_a1;
-	*semV--; /* decrement semaphore */
-	if(*semV < 0){
+	(*semV)--; /* decrement semaphore */
+	if((*semV) < 0){
 		/* something already has control of the semaphore */
 		insertBlocked(semV, currProc);
 		copyState(caller, &(currProc -> p_s));
@@ -260,28 +254,30 @@ HIDDEN void syscall4(state_t* caller){
  * does complicated tlb / PgmTrap / SYS/Bp things
  */
 HIDDEN void syscall5(state_t* caller){
-	
 	switch(caller->s_a1) {
 		case TLBTRAP:
 			if(currProc->tlbNew != NULL) {
-				syscall2();
+				syscall2(); /* already called for this type */
 			}
+			/* assign exception vector values */
 			currProc->tlbNew = (state_t *) caller->s_a3;
 			currProc->tlbOld = (state_t *) caller->s_a2;
 			break;
 			
 		case PROGTRAP:
 			if(currProc->pgmTrpNew != NULL) {
-				syscall2();
+				syscall2(); /* already called for this type */
 			}
+			/* assign exception vector values */
 			currProc->pgmTrpNew = (state_t *) caller->s_a3;
 			currProc->pgmTrpOld = (state_t *) caller->s_a2;
 			break;
 			
 		case SYSTRAP:
 			if(currProc->sysNew != NULL) {
-					syscall2();
-				}
+					syscall2(); /* already called for this type */
+			}
+			/* assign exception vector values */
 			currProc->sysNew = (state_t *) caller->s_a3;
 			currProc->sysOld = (state_t *) caller->s_a2;
 			break;
@@ -318,10 +314,10 @@ HIDDEN void syscall6(state_t* caller){
 HIDDEN void syscall7(state_t* caller){
 	/* interval timer semaphore is last in semD list */
 	int* semV = (int*) &(semD[MAGICNUM-1]);
-	*semV--; /* decrement semaphore */
+	(*semV)--; /* decrement semaphore */
 	insertBlocked(semV, currProc);
-	copyState(caller, &(currProc -> p_s));
-	LDIT(INTTIME);
+	copyState(caller, &(currProc -> p_s)); /* store state back in curr*/
+	LDIT(INTTIME); /* put time in interval timer */
 	sftBlkCount++;
 	scheduler();
 }
@@ -329,14 +325,18 @@ HIDDEN void syscall7(state_t* caller){
 /*
  * SYS8
  * Wait_For_IO_Device
+ * 
+ * Performs a P operation on the requested device semaphore
+ * Line number is in a1 and device number is in a2
+ * 
  */
 HIDDEN void syscall8(state_t* caller){
 	int lineNum, deviceNum, read, index;
 	int *sem;
 	lineNum = caller -> s_a1;
 	deviceNum = caller -> s_a2;
-	read = caller -> s_a3;
-	index = 0;
+	read = caller -> s_a3; /* terminal read / write */
+	/*index = 0;*/
 	
 	if(lineNum < 3 || lineNum > 7){
 		syscall2(); /* illegal IO wait request */
@@ -345,27 +345,33 @@ HIDDEN void syscall8(state_t* caller){
 	/* compute which device */
 	if(lineNum == 7 && read == TRUE){
 		/* terminal read operation */
-		index = DEVPERINT * (lineNum - 3 + read) + deviceNum;
+		index = DEVPERINT * (lineNum - DEVWOSEM + read) + deviceNum;
 	} else {
 		/* anything else */
-		index = DEVPERINT * (lineNum - 3) + deviceNum;
+		index = DEVPERINT * (lineNum - DEVWOSEM) + deviceNum;
 	}
-	
 	sem = &(semD[index]);
-	*sem--;
+	(*sem)--;
 	
-	if(*sem < 0) {
+	if((*sem) < 0) {
+		debugSys(0xabcdabcd, 1,2,3);
 		insertBlocked(sem, currProc);
+		copyState(caller, &(currProc -> p_s));
 		sftBlkCount++;
+		debugSys(0xabcdabcd, 4,5,6);
 		scheduler();
 	}
 	/* ERROR? */
 	/* EDIT */
-	LDST(caller);	
+	LDST(caller);
 }
 
 /*
  * PassUpOrDie
+ * 
+ * Tests if an exception vector has been set for whatever illegal 
+ * operation has been encountered. If so the error is passed up to 
+ * that handler. If none had been set the process is nuked.
  * 
  */
 HIDDEN void PassUpOrDie(state_t* caller, int reason){
@@ -373,21 +379,21 @@ HIDDEN void PassUpOrDie(state_t* caller, int reason){
 	switch(reason){
 		case SYSTRAP: /* syscall exception */
 			if(currProc -> sysNew != NULL){
-				/* yes a trap */
+				/* yes a sys trap created */
 				copyState(caller, currProc -> sysOld);
 				LDST(currProc -> sysNew);
 			}
 		break;
 		case TLBTRAP: /* TLB trap exception */
 			if(currProc -> tlbNew != NULL){
-				/* yes a trap */
+				/* yes a tlb trap created */
 				copyState(caller, currProc -> tlbOld);
 				LDST(currProc -> tlbNew);
 			}
 		break;
 		case PROGTRAP: /* pgmTrp exception */
 			if(currProc -> pgmTrpNew != NULL){
-				/* yes a trap */
+				/* yes a ogm trap created */
 				copyState(caller, currProc -> pgmTrpOld);
 				LDST(currProc -> pgmTrpNew);
 			}
