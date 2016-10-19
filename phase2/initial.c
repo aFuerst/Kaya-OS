@@ -38,6 +38,11 @@ int main(){
 	readyQueue = mkEmptyProcQ();
 	currProc = NULL;
 	procCount = sftBlkCount = 0;
+	
+	/* create a semD for each device and set to 0 */
+	for(i = 0; i < MAGICNUM; ++i){
+		semD[i] = 0;
+	}
 
 	/* Initialize 4 "new" interrupt vectors */
 	/* syscall */
@@ -68,25 +73,23 @@ int main(){
 	newLocation -> s_pc = (memaddr) interruptHandler;
 	newLocation -> s_t9 = (memaddr) interruptHandler;
 
-	/* create a semD for each device and set to 0 */
-	for(i = 0; i < MAGICNUM; ++i){
-		semD[i] = 0;
-	}
-
 	/* create an initial process */	
 	currProc = allocPcb();
-	++procCount;
+	++procCount; /* increment for first process */
+	
 	currProc -> p_s.s_sp = (RAMTOP - PAGESIZE);
 	currProc -> p_s.s_pc = (memaddr) test; /* test function in p2test*/
 	currProc -> p_s.s_t9 = (memaddr) test;
 	/* interrupts are on and is in kernel mode for test */
-	currProc -> p_s.s_status = ALLOFF | IEON | IMON;
+	currProc -> p_s.s_status = ALLOFF | IEON | IMON | TEON;
 
 	/* insert first process into readyQ */
 	insertProcQ(&readyQueue, currProc);
-
+	
+	LDIT(INTTIME); /* start interval timer */
+	
 	/* send control over to the scheduler */
 	scheduler();
 
-	return 1;
+	return -1;/* why not zoidberd (\/) (°,,,°) (\/) */
 }

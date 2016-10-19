@@ -17,11 +17,22 @@
 unsigned int TODStarted;
 unsigned int currentTOD;
 
+extern int procCount;
+extern int sftBlkCount;
+extern pcb_PTR currProc;
+extern pcb_PTR readyQueue;
+extern int semD[MAGICNUM];
+
 void debugSch(int a, int b, int c, int d){
 	int i;
 	i=0;
 }
 
+/*
+ * 
+ * 
+ * 
+ */
 void scheduler() {
 	
 	if(currProc != NULL){
@@ -42,7 +53,7 @@ void scheduler() {
 		LDST(&(currProc -> p_s));
 
 	} else {
-		debugSch(0x12345678, procCount, sftBlkCount, 0xffffffff);
+		/*debugSch(0x12345678, procCount, sftBlkCount, 0xffffffff);
 		/* finished all processes properly */
 		if(procCount == 0) {
 			HALT();
@@ -53,11 +64,14 @@ void scheduler() {
 			PANIC();
 		}
 
+		/* now it's just a waiting game */
 		if(procCount > 0 && sftBlkCount > 0) {
 			/* stuff here! */
-			currProc = NULL;
+			debugSch(0xbbbbbbbb, procCount, sftBlkCount, 0);
+			currProc = NULL; /* no running process */
+			/* enable all interrupts and go to wait state */
 			setSTATUS((getSTATUS() | ALLOFF | IEON | IECON | IMON));
-			WAIT();
+			WAIT(); /* run silent run deep */
 		}
 
 	}

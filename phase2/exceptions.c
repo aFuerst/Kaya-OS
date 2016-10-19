@@ -13,6 +13,7 @@ extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
+/* globals taken from sceduler*/
 extern unsigned int TODStarted;
 extern unsigned int currentTOD;
 
@@ -27,6 +28,8 @@ HIDDEN void syscall7(state_t* caller);
 HIDDEN void syscall8(state_t* caller);
 HIDDEN void sys2Helper(pcb_PTR head);
 HIDDEN void PassUpOrDie(state_t* caller, int reason);
+
+/* functions defined here but also used elsewhere */
 void copyState(state_PTR src, state_PTR dest);
 
 
@@ -43,7 +46,7 @@ HIDDEN void debugSys(int a, int b, int c, int d){
  */
 void tlbManager(){
 	state_PTR caller = (state_PTR) TBLMGMTOLDAREA;
-	PassUpOrDie(caller, TLBTRAP);	
+	PassUpOrDie(caller, TLBTRAP);
 }
 
 /************************* END TLB MANAGER MODULE *********************/
@@ -55,7 +58,7 @@ void tlbManager(){
  */
 void pgmTrap(){
 	state_PTR caller = (state_PTR) PBGTRAPOLDAREA;
-	PassUpOrDie(caller, PROGTRAP);		
+	PassUpOrDie(caller, PROGTRAP);
 }
 
 /************************ END PROGRAM TRAP MODULE *********************/
@@ -317,8 +320,8 @@ HIDDEN void syscall7(state_t* caller){
 	(*semV)--; /* decrement semaphore */
 	insertBlocked(semV, currProc);
 	copyState(caller, &(currProc -> p_s)); /* store state back in curr*/
-	LDIT(INTTIME); /* put time in interval timer */
-	sftBlkCount++;
+	/*LDIT(INTTIME);*/ /* put time in interval timer */
+	++sftBlkCount;
 	scheduler();
 }
 
@@ -352,17 +355,16 @@ HIDDEN void syscall8(state_t* caller){
 	}
 	sem = &(semD[index]);
 	(*sem)--;
-	
+	debugSys(0x99999999, index, (*sem), 0);
 	if((*sem) < 0) {
-		debugSys(0xabcdabcd, 1,2,3);
 		insertBlocked(sem, currProc);
 		copyState(caller, &(currProc -> p_s));
 		sftBlkCount++;
-		debugSys(0xabcdabcd, 4,5,6);
 		scheduler();
 	}
 	/* ERROR? */
 	/* EDIT */
+	debugSys(0x88888888, index, 0, 0);
 	LDST(caller);
 }
 
@@ -404,9 +406,8 @@ HIDDEN void PassUpOrDie(state_t* caller, int reason){
 
 /* 
  * CopyState
- * Copies the state pointed to by src to the location pointed
- * to be dest
- * 
+ * Copies the processor state pointed to by src to the location pointed
+ * to by dest
  */
 void copyState(state_PTR src, state_PTR dest){
 	int i;
