@@ -10,7 +10,7 @@ extern int procCount;
 extern int sftBlkCount;
 extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
-extern unsigned int TODStarted;
+extern cpu_t TODStarted;
 extern int semD[MAGICNUM];
 extern void copyState(state_PTR src, state_PTR dest);
 
@@ -41,7 +41,8 @@ HIDDEN void finish(unsigned int startTime);
  * 
  */
 void interruptHandler(){
-	unsigned int cause, startTime, endTime;
+	unsigned int cause;
+	cpu_t startTime;
 	int devNum, lineNum;
 	device_t *devReg;
 	int index, status;
@@ -54,7 +55,7 @@ void interruptHandler(){
 	/* active interrupting lines */
 	cause = (cause & IPAREA) >> 8; 
 	lineNum = 0;
-	debugInt(0xaddddddd, cause, 0, 0);	
+	/*debugInt(0xaddddddd, cause, 0, 0);	
 	/* An interrupt line will always be on if in handler */
 
 	if((cause & FIRST) != 0) { /* CPU interrupt, line 0 */
@@ -79,10 +80,12 @@ void interruptHandler(){
 		LDIT(INTTIME);
 		int* semV = (int*) &(semD[MAGICNUM-1]);
 		while(headBlocked(semV) != NULL) {
-				waiter = removeBlocked(semV);
-				insertProcQ(&readyQueue, waiter);
+			waiter = removeBlocked(semV);
+			insertProcQ(&readyQueue, waiter);
+			sftBlkCount--;
 		}
 		(*semV) = 0;
+
 		finish(startTime);
 		/* finish up */
 	}
@@ -105,8 +108,8 @@ void interruptHandler(){
 
 	else if((cause & EIGHTH) != 0){ /* terminal device */
 		lineNum = 7;
-		debugInt(0xabcdabcd, 7, 7, 7);
-
+		/*debugInt(0xabcdabcd, 7, 7, 7);
+	*/
 	} else {
 		/* interrupt caused for unknown reason */
 		PANIC();
@@ -118,7 +121,7 @@ void interruptHandler(){
 	
 	/* get actual register associated with that device */
 	devReg = (device_t *) (INTDEVREG + ((lineNum-DEVWOSEM) * DEVREGSIZE * DEVPERINT) + (devNum * DEVREGSIZE));
-	debugInt(0xabcdabcd, devNum, devReg, DEVWOSEM);
+	/*debugInt(0xabcdabcd, devNum, devReg, DEVWOSEM);
 	
 	/* part that will be different for terminal! */
 	if(lineNum != 7){ /* not terminal */
@@ -130,19 +133,16 @@ void interruptHandler(){
 		index = DEVPERINT * (lineNum - DEVWOSEM) + devNum;
 		
 	} else { /* terminal */
-		debugInt(0xabcdabcd, 0xf, 0xf, 0xf);
+		/*debugInt(0xabcdabcd, 0xf, 0xf, 0xf);*/
 		int tranStatus = (devReg -> t_transm_status & 0xFF);
 		/* write terminal */
 		if( tranStatus == 3 || tranStatus == 4 || tranStatus == 5 ) {
-			debugInt(0xabcdabcd, 5, 5, 5);
 			index = (DEVPERINT * (lineNum - DEVWOSEM)) + devNum;
-			debugInt(0x33333333, index, lineNum - DEVWOSEM, devNum);
 			status = devReg -> t_transm_status;
 			devReg -> t_transm_command = ACK;
 		}
 		else {
 			/* if it is a read */
-			debugInt(0xabcdabcd, 6,6,6);
 			index = DEVPERINT * (lineNum - DEVWOSEM + 1) + devNum;
 			status = devReg -> t_recv_status;
 			devReg -> t_recv_command = ACK;
@@ -153,10 +153,9 @@ void interruptHandler(){
 
 	/* V semaphore associated with that device */
 	sem = &(semD[index]);
-	debugInt(0x22222222, index, (*sem)+1,(*sem));
 	(*sem)++;
 
-	if((*sem) < 0) {
+	if((*sem) <= 0) {
 		/* V semaphore process was blocked on */
 		waiter = removeBlocked(sem);
 		waiter -> p_s.s_v0 = status;
@@ -182,12 +181,11 @@ HIDDEN void finish(unsigned int startTime){
 		 * so currProc is not billed for time
 		 */
 		STCK(endTime);
-		TODStarted = TODStarted - (endTime-startTime); 
+		TODStarted = TODStarted + (endTime-startTime); 
 		/* return running process to ready queue */
 		copyState(oldInt, &(currProc ->p_s));
 		insertProcQ(&readyQueue, currProc);
-	}
-	debugInt(0x44444444, currProc, readyQueue, 0);
+	}	
 	scheduler();
 }
 

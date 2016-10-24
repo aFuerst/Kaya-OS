@@ -7,8 +7,8 @@
 #ifndef scheduler_e
 #define scheduler_e
 
-extern unsigned int TODStarted;
-extern unsigned int currentTOD;
+extern cpu_t TODStarted;
+extern cpu_t currentTOD;
 
 extern void scheduler();
 

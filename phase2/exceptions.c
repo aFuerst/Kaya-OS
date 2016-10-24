@@ -13,9 +13,9 @@ extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
-/* globals taken from sceduler*/
-extern unsigned int TODStarted;
-extern unsigned int currentTOD;
+/* globals taken from sceduler */
+extern cpu_t TODStarted;
+extern cpu_t currentTOD;
 
 /* local functions used within this file */
 HIDDEN void syscall1(state_t* caller);
@@ -78,7 +78,6 @@ void pgmTrap(){
 	caller = (state_t*) SYSCALLOLDAREA; /* cpu state of caller*/
 	sysRequest = caller -> s_a0;
 	callerStatus = caller -> s_status;
-	debugSys(0xFFFFFFFF, sysRequest, callerStatus, 0x0);
 	
 	if((sysRequest > 0) && (sysRequest < 9) && 
 		((callerStatus & KUON) != ALLOFF)){
@@ -94,6 +93,7 @@ void pgmTrap(){
 	/* handle valid syscall */
 	switch(sysRequest){
 			case CREATEPROCESS:
+				debugSys(0xFFFFFFFF, sysRequest, callerStatus, 0x0);
 				syscall1(caller);
 			break;
 			case TERMINATEPROCESS:
@@ -145,14 +145,14 @@ HIDDEN void syscall1(state_t* caller){
 	}
 	procCount++;
 	/* make new process a child of current process */
-	temp -> p_prnt = currProc;
+	/*temp -> p_prnt = currProc;*/
 	insertChild(currProc, temp);
 	
 	/* add to the ready queue */
-	insertProcQ(&currProc, temp);
+	insertProcQ(&readyQueue, temp); /* this said currProc not ready Queue */
 
 	/* copy CPU state to new process */
-	copyState(&(temp -> p_s), (state_PTR) caller -> s_a1);
+	copyState((state_PTR) caller -> s_a1, &(temp -> p_s)); /* these were reversed */
 
 	/* set return value */
 	caller -> s_v0 = SUCCESS;
@@ -169,7 +169,6 @@ HIDDEN void syscall1(state_t* caller){
  * called by placing 2 in a0 and executing SYSCALL
  */
 HIDDEN void syscall2(){
-	debugSys(0xABCDEF00, 2,2,2);
 	if(emptyChild(currProc)){
 		/* process has no children */
 		outChild(currProc);
@@ -199,7 +198,12 @@ HIDDEN void sys2Helper(pcb_PTR head){
 	if(head -> p_semAdd != NULL){
 		/* try and remove self from ASL */
 		outBlocked(head);
-		sftBlkCount--;
+		/* TODO only decrement sftBlkCnt if pcb was blocked on a device*/
+		if((head -> p_semAdd) > &(semD[0]) && (head -> p_semAdd) < &(semD[MAGICNUM-1])){ /* check if blocked on device */
+			sftBlkCount--; 
+		} else {
+			(*(head -> p_semAdd))--; /* decrement semaphore */
+		}
 	} else if (head == currProc) {
 		/* try and remove process from it's parent */
 		outChild(currProc);
@@ -219,14 +223,18 @@ HIDDEN void sys2Helper(pcb_PTR head){
  * the physical address of the semaphore to be V'ed in a1
  */
 HIDDEN void syscall3(state_t* caller){
-	pcb_PTR newProc;
+	pcb_PTR newProc = NULL;
 	int* semV = (int*) caller->s_a1;
 	(*semV)++; /* increment semaphore */
 	if((*semV) <= 0) {
 		/* something is waiting on the semaphore */
 		newProc = removeBlocked(semV);
-		/* add it to the ready queue */
-		insertProcQ(&readyQueue, newProc);
+		if(newProc != NULL){
+			/* add it to the ready queue */
+			insertProcQ(&readyQueue, newProc);
+		} else {
+			/* nothing was waiting on semaphore */
+		}
 	}
 	/* always return control to caller */
 	LDST(caller);
@@ -243,8 +251,8 @@ HIDDEN void syscall4(state_t* caller){
 	(*semV)--; /* decrement semaphore */
 	if((*semV) < 0){
 		/* something already has control of the semaphore */
-		insertBlocked(semV, currProc);
 		copyState(caller, &(currProc -> p_s));
+		insertBlocked(semV, currProc);
 		scheduler();
 	}
 	/* nothing had control of the sem, return control to caller */
@@ -257,6 +265,7 @@ HIDDEN void syscall4(state_t* caller){
  * does complicated tlb / PgmTrap / SYS/Bp things
  */
 HIDDEN void syscall5(state_t* caller){
+	debugSys(0x55555555, 5, 5, 5);
 	switch(caller->s_a1) {
 		case TLBTRAP:
 			if(currProc->tlbNew != NULL) {
@@ -297,30 +306,31 @@ HIDDEN void syscall5(state_t* caller){
  * each process. 
  */
 HIDDEN void syscall6(state_t* caller){
+	debugSys(0x66666666, 6, 6, 6);
 	/* get current time, subtract from global start time */
 	STCK(currentTOD);
 	/* add that to process used time and give to process */
-	currProc->cpu_time = currProc->cpu_time + (currentTOD - TODStarted);
+	currProc->cpu_time = (currProc->cpu_time) + (currentTOD - TODStarted);
 	currProc->p_s.s_v0 = currProc->cpu_time;
-	
-	TODStarted = currentTOD; /* update start time */
+	/*TODStarted = currentTOD; /* update start time */
+	STCK(TODStarted);
 	LDST(caller);
 }
 
 /*
  * SYS7
  * Wait_For_Clock
- * Perform a V operation on the nucleus maintained pseudo-clock timer
+ * Perform a P operation on the nucleus maintained pseudo-clock timer
  * semaphore. This semaphore is V'ed every 100 milliseconds 
  * automatically by the nucleus. 
  */
 HIDDEN void syscall7(state_t* caller){
+	debugSys(0x77777777, 7, 7, 7);
 	/* interval timer semaphore is last in semD list */
 	int* semV = (int*) &(semD[MAGICNUM-1]);
 	(*semV)--; /* decrement semaphore */
 	insertBlocked(semV, currProc);
 	copyState(caller, &(currProc -> p_s)); /* store state back in curr*/
-	/*LDIT(INTTIME);*/ /* put time in interval timer */
 	++sftBlkCount;
 	scheduler();
 }
@@ -355,7 +365,6 @@ HIDDEN void syscall8(state_t* caller){
 	}
 	sem = &(semD[index]);
 	(*sem)--;
-	debugSys(0x99999999, index, (*sem), 0);
 	if((*sem) < 0) {
 		insertBlocked(sem, currProc);
 		copyState(caller, &(currProc -> p_s));
@@ -364,7 +373,6 @@ HIDDEN void syscall8(state_t* caller){
 	}
 	/* ERROR? */
 	/* EDIT */
-	debugSys(0x88888888, index, 0, 0);
 	LDST(caller);
 }
 

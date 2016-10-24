@@ -47,6 +47,7 @@
 #define VMON			0x02000000 /* OR to turn on virtual memory */
 #define INTON			0x08000000 /* OR to turn on interval timer */
 #define IMON			0x0000FF00 /* OR to turn on Interrupt Mask */
+#define TEON			0x08000000 /* OR to turn the local timer on */
 #define IEOFF			0xFFFFFFFB /* AND to turn off interrupts */
 #define KUOFF			0xFFFFFFF7 /* AND to turn on kernel mode */
 #define VMOFF			0xFDFFFFFF /* AND to turn off virtual memory */
