@@ -33,7 +33,7 @@ void debug(int a){
 
 /* local functions */
 HIDDEN int getDeviceNumber(unsigned int* bitMap);
-HIDDEN void finish(unsigned int startTime);
+HIDDEN void finish(cpu_t startTime);
 
 /*
  * interruptHandler
@@ -42,11 +42,11 @@ HIDDEN void finish(unsigned int startTime);
  */
 void interruptHandler(){
 	unsigned int cause;
-	cpu_t startTime;
+	cpu_t startTime, endTime;
 	int devNum, lineNum;
 	device_t *devReg;
 	int index, status;
-	int* sem;
+	int* semV;
 	pcb_PTR waiter;
 	state_PTR oldInt = (state_PTR) INTPOLDAREA;
 	STCK(startTime); /* save time started in interrupt handler */
@@ -54,8 +54,7 @@ void interruptHandler(){
 	cause = oldInt -> s_cause; /* which line caused interrupt */
 	/* active interrupting lines */
 	cause = (cause & IPAREA) >> 8; 
-	lineNum = 0;
-	/*debugInt(0xaddddddd, cause, 0, 0);	
+	lineNum = 0;	
 	/* An interrupt line will always be on if in handler */
 
 	if((cause & FIRST) != 0) { /* CPU interrupt, line 0 */
@@ -74,15 +73,19 @@ void interruptHandler(){
 
 	else if((cause & THIRD) != 0){ /* interval timer, line 2 */
 		debugInt(0xabcdabcd, 2,2, 2);
-		/* LDIT(INTTIME); *//* load 100 ms into interval timer*/
-		/* unblock everyone who was blocked on the semaphore */
-		
-		LDIT(INTTIME);
-		int* semV = (int*) &(semD[MAGICNUM-1]);
+		/* unblock everyone who was blocked on the semaphore */	
+		LDIT(INTTIME);/* load 100 ms into interval timer*/
+		semV = (int*) &(semD[MAGICNUM-1]);
 		while(headBlocked(semV) != NULL) {
 			waiter = removeBlocked(semV);
-			insertProcQ(&readyQueue, waiter);
-			sftBlkCount--;
+			STCK(endTime);
+			if(waiter != NULL){
+				insertProcQ(&readyQueue, waiter);
+				/* bill process for time in interrupt handler */
+				(waiter->cpu_time) = (waiter->cpu_time) + (endTime - startTime);
+				sftBlkCount--;
+				
+			}
 		}
 		(*semV) = 0;
 
@@ -108,8 +111,6 @@ void interruptHandler(){
 
 	else if((cause & EIGHTH) != 0){ /* terminal device */
 		lineNum = 7;
-		/*debugInt(0xabcdabcd, 7, 7, 7);
-	*/
 	} else {
 		/* interrupt caused for unknown reason */
 		PANIC();
@@ -121,7 +122,6 @@ void interruptHandler(){
 	
 	/* get actual register associated with that device */
 	devReg = (device_t *) (INTDEVREG + ((lineNum-DEVWOSEM) * DEVREGSIZE * DEVPERINT) + (devNum * DEVREGSIZE));
-	/*debugInt(0xabcdabcd, devNum, devReg, DEVWOSEM);
 	
 	/* part that will be different for terminal! */
 	if(lineNum != 7){ /* not terminal */
@@ -152,12 +152,12 @@ void interruptHandler(){
 	/* everything after this is same again */
 
 	/* V semaphore associated with that device */
-	sem = &(semD[index]);
-	(*sem)++;
+	semV = &(semD[index]);
+	(*semV)++;
 
-	if((*sem) <= 0) {
+	if((*semV) <= 0) {
 		/* V semaphore process was blocked on */
-		waiter = removeBlocked(sem);
+		waiter = removeBlocked(semV);
 		waiter -> p_s.s_v0 = status;
 		insertProcQ(&readyQueue, waiter);
 		--sftBlkCount;		
@@ -173,19 +173,19 @@ void interruptHandler(){
 	finish(startTime);
 }
 
-HIDDEN void finish(unsigned int startTime){
-	unsigned int endTime;
+HIDDEN void finish(cpu_t startTime){
+	cpu_t endTime;
 	state_PTR oldInt = (state_PTR) INTPOLDAREA;
 	if(currProc != NULL){ /* was not in a wait state */
 		/* take time used in interrupt handler and add it to TODstarted
 		 * so currProc is not billed for time
 		 */
 		STCK(endTime);
-		TODStarted = TODStarted + (endTime-startTime); 
+		TODStarted = TODStarted + (endTime-startTime);
 		/* return running process to ready queue */
 		copyState(oldInt, &(currProc ->p_s));
 		insertProcQ(&readyQueue, currProc);
-	}	
+	}
 	scheduler();
 }
 

@@ -177,6 +177,7 @@ HIDDEN void syscall2(){
 	} else {
 		sys2Helper(currProc);
 	}
+	currProc = NULL;
 	/* call scheduler */
 	scheduler();
 }
@@ -306,13 +307,13 @@ HIDDEN void syscall5(state_t* caller){
  * each process. 
  */
 HIDDEN void syscall6(state_t* caller){
-	debugSys(0x66666666, 6, 6, 6);
+	cpu_t temp;
 	/* get current time, subtract from global start time */
-	STCK(currentTOD);
+	STCK(temp);
 	/* add that to process used time and give to process */
-	currProc->cpu_time = (currProc->cpu_time) + (currentTOD - TODStarted);
-	currProc->p_s.s_v0 = currProc->cpu_time;
-	/*TODStarted = currentTOD; /* update start time */
+	(currProc->cpu_time) = (currProc->cpu_time) + (temp - TODStarted);
+	(caller -> s_v0) = (currProc->cpu_time);
+	/* update start time */
 	STCK(TODStarted);
 	LDST(caller);
 }
@@ -325,7 +326,6 @@ HIDDEN void syscall6(state_t* caller){
  * automatically by the nucleus. 
  */
 HIDDEN void syscall7(state_t* caller){
-	debugSys(0x77777777, 7, 7, 7);
 	/* interval timer semaphore is last in semD list */
 	int* semV = (int*) &(semD[MAGICNUM-1]);
 	(*semV)--; /* decrement semaphore */

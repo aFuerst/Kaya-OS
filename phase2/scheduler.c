@@ -34,12 +34,12 @@ void debugSch(int a, int b, int c, int d){
  * 
  */
 void scheduler() {
-	
+
 	if(currProc != NULL){
 		/* save how much time current process used on CPU */
 		/* subtract current time from global start time to get this ^ */
 		STCK(currentTOD);
-		currProc->cpu_time = currProc->cpu_time + (currentTOD - TODStarted);
+		currProc->cpu_time = (currProc->cpu_time) + (currentTOD - TODStarted);
 	}
 
 	if(!emptyProcQ(readyQueue)) {
@@ -49,7 +49,7 @@ void scheduler() {
 		STCK(TODStarted);
 		/* load QUANTUM into process timer */
 		setTIMER(QUANTUM);
-		
+
 		LDST(&(currProc -> p_s));
 
 	} else {

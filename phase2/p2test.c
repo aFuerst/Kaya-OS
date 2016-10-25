@@ -229,15 +229,9 @@ void test() {
 
 	print("p2 was started\n");
 
-	debugTest(0x0,0,0,(&startp2));
-
 	SYSCALL(VERHOGEN, (int)&startp2, 0, 0);					/* V(startp2)   */
 
-	debugTest(1,1,1,(&endp2));
-
 	SYSCALL(PASSERN, (int)&endp2, 0, 0);					/* P(endp2)     */
-
-	debugTest(2,2,2,2);
 
 	/* make sure we really blocked */
 	if (p1p2synch == 0)

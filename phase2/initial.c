@@ -85,7 +85,7 @@ int main(){
 
 	/* insert first process into readyQ */
 	insertProcQ(&readyQueue, currProc);
-	
+	currProc = NULL;
 	LDIT(INTTIME); /* start interval timer */
 	
 	/* send control over to the scheduler */

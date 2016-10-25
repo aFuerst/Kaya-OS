@@ -7,9 +7,7 @@
  * 
  **********************************************************************/
 
-
 typedef signed int cpu_t;
-
 
 typedef unsigned int memaddr;
 
