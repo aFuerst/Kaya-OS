@@ -19,11 +19,6 @@ HIDDEN void debugInt(int a, int b, int c, int d){
 	i=0;
 }
 
-void debug(int a){
-	int i;
-	i=0;
-}
-
 /*
 	This module implements the device interruption exception handler.
 	This module will process all the device interrupts, inculding 
@@ -45,7 +40,7 @@ void interruptHandler(){
 	cpu_t startTime, endTime;
 	int devNum, lineNum;
 	device_t *devReg;
-	int index, status;
+	int index, status, tranStatus;
 	int* semV;
 	pcb_PTR waiter;
 	state_PTR oldInt = (state_PTR) INTPOLDAREA;
@@ -63,16 +58,13 @@ void interruptHandler(){
 	}
 
 	else if((cause & SECOND) != 0){ /* local timer, line 1 */
-		debugInt(0xabcdabcd, 1, 1, 1);
 		/* someone's clock ran out, call scheduler */
 		insertProcQ(&readyQueue, currProc);
 		copyState(oldInt, &(currProc->p_s));
 		scheduler();
-		
 	}
 
 	else if((cause & THIRD) != 0){ /* interval timer, line 2 */
-		debugInt(0xabcdabcd, 2,2, 2);
 		/* unblock everyone who was blocked on the semaphore */	
 		LDIT(INTTIME);/* load 100 ms into interval timer*/
 		semV = (int*) &(semD[MAGICNUM-1]);
@@ -82,13 +74,13 @@ void interruptHandler(){
 			if(waiter != NULL){
 				insertProcQ(&readyQueue, waiter);
 				/* bill process for time in interrupt handler */
-				(waiter->cpu_time) = (waiter->cpu_time) + (endTime - startTime);
+				(waiter->cpu_time) = 
+							(waiter->cpu_time) + (endTime - startTime);
 				sftBlkCount--;
 				
 			}
 		}
 		(*semV) = 0;
-
 		finish(startTime);
 		/* finish up */
 	}
@@ -111,6 +103,7 @@ void interruptHandler(){
 
 	else if((cause & EIGHTH) != 0){ /* terminal device */
 		lineNum = 7;
+
 	} else {
 		/* interrupt caused for unknown reason */
 		PANIC();
@@ -121,20 +114,20 @@ void interruptHandler(){
 					((lineNum-DEVWOSEM) * WORDLEN));
 	
 	/* get actual register associated with that device */
-	devReg = (device_t *) (INTDEVREG + ((lineNum-DEVWOSEM) * DEVREGSIZE * DEVPERINT) + (devNum * DEVREGSIZE));
+	devReg = (device_t *) (INTDEVREG + ((lineNum-DEVWOSEM)
+					* DEVREGSIZE * DEVPERINT) + (devNum * DEVREGSIZE));
 	
 	/* part that will be different for terminal! */
 	if(lineNum != 7){ /* not terminal */
 		/* store device status */
 		status = devReg -> d_status;
 		/* ACK device */
-		devReg -> d_command = ACK;	
+		devReg -> d_command = ACK;
 		/* compute which semaphore to V*/
 		index = DEVPERINT * (lineNum - DEVWOSEM) + devNum;
 		
 	} else { /* terminal */
-		/*debugInt(0xabcdabcd, 0xf, 0xf, 0xf);*/
-		int tranStatus = (devReg -> t_transm_status & 0xFF);
+		tranStatus = (devReg -> t_transm_status & 0xFF);
 		/* write terminal */
 		if( tranStatus == 3 || tranStatus == 4 || tranStatus == 5 ) {
 			index = (DEVPERINT * (lineNum - DEVWOSEM)) + devNum;
@@ -147,7 +140,6 @@ void interruptHandler(){
 			status = devReg -> t_recv_status;
 			devReg -> t_recv_command = ACK;
 		}
-		
 	}
 	/* everything after this is same again */
 

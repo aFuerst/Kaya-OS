@@ -76,7 +76,7 @@ int main(){
 	/* create an initial process */	
 	currProc = allocPcb();
 	++procCount; /* increment for first process */
-	
+
 	currProc -> p_s.s_sp = (RAMTOP - PAGESIZE);
 	currProc -> p_s.s_pc = (memaddr) test; /* test function in p2test*/
 	currProc -> p_s.s_t9 = (memaddr) test;
