@@ -18,16 +18,16 @@ extern cpu_t TODStarted;
 extern cpu_t currentTOD;
 
 /* local functions used within this file */
-HIDDEN void syscall1(state_t* caller);
+HIDDEN void syscall1(state_PTR caller);
 HIDDEN void syscall2();
-HIDDEN void syscall3(state_t* caller);
-HIDDEN void syscall4(state_t* caller);
-HIDDEN void syscall5(state_t* caller);
-HIDDEN void syscall6(state_t* caller);
-HIDDEN void syscall7(state_t* caller);
-HIDDEN void syscall8(state_t* caller);
+HIDDEN void syscall3(state_PTR caller);
+HIDDEN void syscall4(state_PTR caller);
+HIDDEN void syscall5(state_PTR caller);
+HIDDEN void syscall6(state_PTR caller);
+HIDDEN void syscall7(state_PTR caller);
+HIDDEN void syscall8(state_PTR caller);
 HIDDEN void sys2Helper(pcb_PTR head);
-HIDDEN void PassUpOrDie(state_t* caller, int reason);
+HIDDEN void PassUpOrDie(state_PTR caller, int reason);
 
 /* functions defined here but also used elsewhere */
 void copyState(state_PTR src, state_PTR dest);
@@ -46,7 +46,7 @@ HIDDEN void debugSys(int a, int b, int c, int d){
  */
 void tlbManager(){
 	state_PTR caller = (state_PTR) TBLMGMTOLDAREA;
-	caller -> s_pc = caller -> s_pc + 4;
+	(caller -> s_pc) = (caller -> s_pc) + 4;
 	PassUpOrDie(caller, TLBTRAP);
 }
 
@@ -58,8 +58,8 @@ void tlbManager(){
  *	Program Trap Handler
  */
 void pgmTrap(){
-	state_PTR caller = (state_PTR) PBGTRAPOLDAREA;
-	caller -> s_pc = caller -> s_pc + 4;
+	state_PTR caller = (state_PTR) PGMTRAPOLDAREA;
+	(caller -> s_pc) = (caller -> s_pc) + 4;
 	PassUpOrDie(caller, PROGTRAP);
 }
 
@@ -73,24 +73,23 @@ void pgmTrap(){
  * 
  */
  void syscallHandler(){
-	state_t* caller, *pgm;
+	state_PTR caller, pgm;
 	int sysRequest;
 	unsigned int callerStatus, temp;
 	
-	caller = (state_t*) SYSCALLOLDAREA; /* cpu state of caller*/
+	caller = (state_PTR) SYSCALLOLDAREA; /* cpu state of caller*/
 	sysRequest = caller -> s_a0;
 	callerStatus = caller -> s_status;
 	
 	if((sysRequest > 0) && (sysRequest < 9) && 
 		((callerStatus & KUON) != ALLOFF)){
-		pgm = (state_t*) PBGTRAPOLDAREA;
+		pgm = (state_PTR) PGMTRAPOLDAREA;
 		/* syscall is 1-8 and in not kernel mode */
 		/* cause a program trap */
 		copyState(caller, pgm);
 		/* set cause to privlidged instruction exception */
-		temp = (caller -> s_cause) & ~(0xFF);
-		pgm -> s_cause = temp | (10 << 2);
-		/*pgm -> s_cause = (pgm -> s_cause) << 2;*/
+		temp = (pgm -> s_cause) & ~(0xFF);
+		(pgm -> s_cause) = (temp | (10 << 2));
 		pgmTrap();
 	}
 	/* increment caller's PC to next instruction */
@@ -174,13 +173,15 @@ HIDDEN void syscall1(state_t* caller){
  */
 HIDDEN void syscall2(){
 	if(emptyChild(currProc)){
-		/* process has no children */
+		/* current process has no children */
 		outChild(currProc);
 		freePcb(currProc);
 		--procCount;
 	} else {
+		/* recusrive call */
 		sys2Helper(currProc);
 	}
+	/* no current process anymore */
 	currProc = NULL;
 	/* call scheduler */
 	scheduler();
@@ -202,13 +203,13 @@ HIDDEN void sys2Helper(pcb_PTR head){
 
 	if(head -> p_semAdd != NULL){
 		/* try and remove self from ASL */
+		int* sem = head -> p_semAdd;
 		outBlocked(head);
 		/* check if blocked on device */
-		if((head -> p_semAdd) >= &(semD[0]) && 
-		(head -> p_semAdd) <= &(semD[MAGICNUM-1])){ 
+		if(sem >= &(semD[0]) && sem <= &(semD[MAGICNUM-1])){ 
 			sftBlkCount--;
 		} else {
-			(*(head -> p_semAdd))++; /* increment semaphore */
+			++(*(sem)); /* increment semaphore */
 		}
 	} else if (head == currProc) {
 		/* try and remove process from it's parent */
@@ -220,6 +221,7 @@ HIDDEN void sys2Helper(pcb_PTR head){
 	/* free self after we have no more children */
 	freePcb(head);
 	--procCount;
+	debugSys(0x22222222, procCount, 0,0);
 }
 
 /*
@@ -228,7 +230,7 @@ HIDDEN void sys2Helper(pcb_PTR head){
  * Perform a V operation on a semaphore. Place the value 3 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
-HIDDEN void syscall3(state_t* caller){
+HIDDEN void syscall3(state_PTR caller){
 	pcb_PTR newProc = NULL;
 	int* semV = (int*) caller->s_a1;
 	++(*semV); /* increment semaphore */
@@ -252,9 +254,8 @@ HIDDEN void syscall3(state_t* caller){
  * Perform a P operation on a semaphore. Place the value 4 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  */
-HIDDEN void syscall4(state_t* caller){
+HIDDEN void syscall4(state_PTR caller){
 	int* semV = (int*) caller->s_a1;
-	debugSys(0xffffffff, semV, (*semV), 0);
 	--(*semV); /* decrement semaphore */
 	if((*semV) < 0){
 		/* something already has control of the semaphore */
@@ -271,24 +272,25 @@ HIDDEN void syscall4(state_t* caller){
  * Specify_Exception_State_Vector
  * does complicated tlb / PgmTrap / SYS/Bp things
  */
-HIDDEN void syscall5(state_t* caller){
+HIDDEN void syscall5(state_PTR caller){
 	switch(caller->s_a1) {
 		case TLBTRAP:
 			if(currProc->tlbNew != NULL) {
 				syscall2(); /* already called for this type */
 			}
 			/* assign exception vector values */
-			currProc->tlbNew = (state_t *) caller->s_a3;
-			currProc->tlbOld = (state_t *) caller->s_a2;
+			currProc->tlbNew = (state_PTR) caller->s_a3;
+			currProc->tlbOld = (state_PTR) caller->s_a2;
 			break;
 			
 		case PROGTRAP:
+			debugSys(0xffffffff, 0, 0, 0);
 			if(currProc->pgmTrpNew != NULL) {
 				syscall2(); /* already called for this type */
 			}
 			/* assign exception vector values */
-			currProc->pgmTrpNew = (state_t *) caller->s_a3;
-			currProc->pgmTrpOld = (state_t *) caller->s_a2;
+			currProc->pgmTrpNew = (state_PTR) caller->s_a3;
+			currProc->pgmTrpOld = (state_PTR) caller->s_a2;
 			break;
 			
 		case SYSTRAP:
@@ -296,8 +298,8 @@ HIDDEN void syscall5(state_t* caller){
 					syscall2(); /* already called for this type */
 			}
 			/* assign exception vector values */
-			currProc->sysNew = (state_t *) caller->s_a3;
-			currProc->sysOld = (state_t *) caller->s_a2;
+			currProc->sysNew = (state_PTR) caller->s_a3;
+			currProc->sysOld = (state_PTR) caller->s_a2;
 			break;
 	}
 	LDST(caller);
@@ -311,7 +313,7 @@ HIDDEN void syscall5(state_t* caller){
  * must record (in the ProcBlk) the amount of processor time used by 
  * each process. 
  */
-HIDDEN void syscall6(state_t* caller){
+HIDDEN void syscall6(state_PTR caller){
 	cpu_t temp;
 	/* get current time, subtract from global start time */
 	STCK(temp);
@@ -330,7 +332,7 @@ HIDDEN void syscall6(state_t* caller){
  * semaphore. This semaphore is V'ed every 100 milliseconds 
  * automatically by the nucleus. 
  */
-HIDDEN void syscall7(state_t* caller){
+HIDDEN void syscall7(state_PTR caller){
 	/* interval timer semaphore is last in semD list */
 	int* semV = (int*) &(semD[MAGICNUM-1]);
 	--(*semV); /* decrement semaphore */
@@ -348,7 +350,7 @@ HIDDEN void syscall7(state_t* caller){
  * Line number is in a1 and device number is in a2
  * 
  */
-HIDDEN void syscall8(state_t* caller){
+HIDDEN void syscall8(state_PTR caller){
 	int lineNum, deviceNum, read, index;
 	int *sem;
 	lineNum = caller -> s_a1;
@@ -373,7 +375,7 @@ HIDDEN void syscall8(state_t* caller){
 	if((*sem) < 0) {
 		insertBlocked(sem, currProc);
 		copyState(caller, &(currProc -> p_s));
-		sftBlkCount++;
+		++sftBlkCount;
 		scheduler();
 	}
 	/* ERROR? */
@@ -389,7 +391,7 @@ HIDDEN void syscall8(state_t* caller){
  * that handler. If none had been set the process is nuked.
  * 
  */
-HIDDEN void PassUpOrDie(state_t* caller, int reason){
+HIDDEN void PassUpOrDie(state_PTR caller, int reason){
 	/* has a sys 5 been called? */
 	switch(reason){
 		case SYSTRAP: /* syscall exception */

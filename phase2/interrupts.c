@@ -59,9 +59,7 @@ void interruptHandler(){
 
 	else if((cause & SECOND) != 0){ /* local timer, line 1 */
 		/* someone's clock ran out, call scheduler */
-		insertProcQ(&readyQueue, currProc);
-		copyState(oldInt, &(currProc->p_s));
-		scheduler();
+		finish(startTime);
 	}
 
 	else if((cause & THIRD) != 0){ /* interval timer, line 2 */
@@ -76,7 +74,7 @@ void interruptHandler(){
 				/* bill process for time in interrupt handler */
 				(waiter->cpu_time) = 
 							(waiter->cpu_time) + (endTime - startTime);
-				sftBlkCount--;
+				--sftBlkCount;
 				
 			}
 		}
@@ -145,14 +143,16 @@ void interruptHandler(){
 
 	/* V semaphore associated with that device */
 	semV = &(semD[index]);
-	(*semV)++;
+	++(*semV);
 
 	if((*semV) <= 0) {
 		/* V semaphore process was blocked on */
 		waiter = removeBlocked(semV);
-		waiter -> p_s.s_v0 = status;
-		insertProcQ(&readyQueue, waiter);
-		--sftBlkCount;		
+		if(waiter != NULL){
+			waiter -> p_s.s_v0 = status;
+			insertProcQ(&readyQueue, waiter);
+			--sftBlkCount;
+		}
 	} else {
 		/* ERROR? */
 	}

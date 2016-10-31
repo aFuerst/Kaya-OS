@@ -253,13 +253,13 @@ pcb_PTR removeChild(pcb_PTR p){
 		/* only one child */
 		p -> p_child = NULL;
 		p -> p_prnt = NULL;
-		return p;
+		return ret;
 	} else {
 		/* has siblings */
 		p -> p_child = p -> p_child -> p_sibNext;
 		p -> p_child -> p_sibPrev = NULL;
 		p -> p_prnt = NULL;
-		return p;		
+		return ret;		
 	}
 }
 
