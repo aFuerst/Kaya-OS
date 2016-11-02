@@ -33,12 +33,6 @@ HIDDEN void PassUpOrDie(state_PTR caller, int reason);
 void copyState(state_PTR src, state_PTR dest);
 
 
-HIDDEN void debugSys(int a, int b, int c, int d){
-	int i;
-	i=0;
-}
-
-
 /*********************** START TLB MANAGER MODULE *********************/
 
 /*
@@ -46,7 +40,6 @@ HIDDEN void debugSys(int a, int b, int c, int d){
  */
 void tlbManager(){
 	state_PTR caller = (state_PTR) TBLMGMTOLDAREA;
-	(caller -> s_pc) = (caller -> s_pc) + 4;
 	PassUpOrDie(caller, TLBTRAP);
 }
 
@@ -59,7 +52,6 @@ void tlbManager(){
  */
 void pgmTrap(){
 	state_PTR caller = (state_PTR) PGMTRAPOLDAREA;
-	(caller -> s_pc) = (caller -> s_pc) + 4;
 	PassUpOrDie(caller, PROGTRAP);
 }
 
@@ -200,10 +192,12 @@ HIDDEN void sys2Helper(pcb_PTR head){
 		/* nuke it till it pukes */
 		sys2Helper(removeChild(head));
 	}
-
+	
 	if(head -> p_semAdd != NULL){
 		/* try and remove self from ASL */
 		int* sem = head -> p_semAdd;
+		
+		/* debug */		
 		outBlocked(head);
 		/* check if blocked on device */
 		if(sem >= &(semD[0]) && sem <= &(semD[MAGICNUM-1])){ 
@@ -221,7 +215,6 @@ HIDDEN void sys2Helper(pcb_PTR head){
 	/* free self after we have no more children */
 	freePcb(head);
 	--procCount;
-	debugSys(0x22222222, procCount, 0,0);
 }
 
 /*
@@ -284,7 +277,6 @@ HIDDEN void syscall5(state_PTR caller){
 			break;
 			
 		case PROGTRAP:
-			debugSys(0xffffffff, 0, 0, 0);
 			if(currProc->pgmTrpNew != NULL) {
 				syscall2(); /* already called for this type */
 			}

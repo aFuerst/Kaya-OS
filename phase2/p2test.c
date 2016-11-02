@@ -254,7 +254,7 @@ void test() {
 	SYSCALL(PASSERN, (int)&endp5, 0, 0);					/* P(endp5)		*/ 
 
 	print("p1 knows p5 ended\n");
-	debugTest(0xaaaaaaaa,1,1,1);
+
 	SYSCALL(PASSERN, (int)&blkp4, 0, 0);					/* P(blkp4)		*/
 	debugTest(0xaaaaaaaa,1,1,1);
 	
@@ -269,7 +269,7 @@ void test() {
 
 		SYSCALL(PASSERN, (int)&endp8, 0, 0);
 	}
-
+	debugTest(0xbbbbbbbb,0,0,0);
 	print("p1 finishes OK -- TTFN\n");
 	* ((memaddr *) BADADDR) = 0;				/* terminate p1 */
 

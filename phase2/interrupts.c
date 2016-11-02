@@ -14,11 +14,6 @@ extern cpu_t TODStarted;
 extern int semD[MAGICNUM];
 extern void copyState(state_PTR src, state_PTR dest);
 
-HIDDEN void debugInt(int a, int b, int c, int d){
-	int i;
-	i=0;
-}
-
 /*
 	This module implements the device interruption exception handler.
 	This module will process all the device interrupts, inculding 

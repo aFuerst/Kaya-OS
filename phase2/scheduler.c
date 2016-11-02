@@ -23,11 +23,6 @@ extern pcb_PTR currProc;
 extern pcb_PTR readyQueue;
 extern int semD[MAGICNUM];
 
-void debugSch(int a, int b, int c, int d){
-	int i;
-	i=0;
-}
-
 /*
  * 
  * 
@@ -62,7 +57,6 @@ void scheduler() {
 
 		/* deadlock */
 		if(procCount > 0 && sftBlkCount == 0) {
-			debugSch(0xaaaaaaaa,procCount,sftBlkCount,1);
 			PANIC();
 		}
 
