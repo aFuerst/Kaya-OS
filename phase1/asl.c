@@ -29,11 +29,6 @@ HIDDEN semd_t *search(int *semAdd);
 HIDDEN void freeSEMD(semd_t *s);
 HIDDEN semd_t *allocSEMD();
 
-void debugA(int a){
-	int i;
-	i=0;
-}
-
 /*
 	insert the pcb pointed to be p at the tail of the process queue
 	at semaphore semAdd and set it's semaphore address to semAdd.
@@ -175,7 +170,7 @@ HIDDEN semd_t *allocSEMD(){
 	semdFreeList_h = semdFreeList_h -> s_next;
 	/* set values to start state */
 	ret -> s_next = NULL;
-	ret -> s_semAdd = 0;
+	ret -> s_semAdd = NULL;
 	ret -> s_procQ = mkEmptyProcQ(); 
 	return ret;
 }
