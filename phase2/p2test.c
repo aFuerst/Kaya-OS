@@ -17,6 +17,11 @@
 #include "../h/types.h"
 #include "/usr/local/include/umps2/umps/libumps.e"
 
+void debugTest(int a, int b, int c, int d){
+	int i;
+	i=0;
+}
+
 typedef unsigned int devregtr;
 
 /* hardware constants */
@@ -228,7 +233,7 @@ void test() {
 
 	SYSCALL(PASSERN, (int)&endp2, 0, 0);					/* P(endp2)     */
 
-	/* make sure we really blocked */
+	/* make sure fe really blocked */
 	if (p1p2synch == 0)
 		print("error: p1/p2 synchronization bad\n");
 
@@ -251,7 +256,8 @@ void test() {
 	print("p1 knows p5 ended\n");
 
 	SYSCALL(PASSERN, (int)&blkp4, 0, 0);					/* P(blkp4)		*/
-
+	debugTest(0xaaaaaaaa,1,1,1);
+	
 	/* now for a more rigorous check of process termination */
 	for (p8inc=0; p8inc<4; p8inc++) {
 		creation = SYSCALL(CREATETHREAD, (int)&p8rootstate, 0, 0);
@@ -263,7 +269,7 @@ void test() {
 
 		SYSCALL(PASSERN, (int)&endp8, 0, 0);
 	}
-
+	debugTest(0xbbbbbbbb,0,0,0);
 	print("p1 finishes OK -- TTFN\n");
 	* ((memaddr *) BADADDR) = 0;				/* terminate p1 */
 
@@ -389,8 +395,9 @@ void p4() {
 
 	SYSCALL(VERHOGEN, (int)&synp4, 0, 0);				/* V(synp4)     */
 
+	print("P'ing blkp4\n");
 	SYSCALL(PASSERN, (int)&blkp4, 0, 0);				/* P(blkp4)     */
-
+	print("Woke from P'ing blkp4\n");
 	SYSCALL(PASSERN, (int)&synp4, 0, 0);				/* P(synp4)     */
 
 	/* start another incarnation of p4 running, and wait for  */
@@ -529,13 +536,11 @@ void p5b() {
 		SYSCALL(WAITCLOCK, 0, 0, 0);
 		STCK(time2);
 	}
-
 	/* if p4 and offspring are really dead, this will increment blkp4 */
-
+	print("here I am! V'ing blkp4\n");
 	SYSCALL(VERHOGEN, (int)&blkp4, 0, 0);			/* V(blkp4) */
 
 	SYSCALL(VERHOGEN, (int)&endp5, 0, 0);			/* V(endp5) */
-
 	/* should cause a termination       */
 	/* since this has already been      */
 	/* done for PROGTRAPs               */

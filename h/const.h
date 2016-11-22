@@ -17,7 +17,7 @@
 
 #define ROMPAGESTART	0x20000000	 	/* ROM Reserved Page */
 #define QUANTUM 		5000			/* CPU burst time */
-#define INTTIME			1000000 		/* interval timer period */
+#define INTTIME			100000 		/* interval timer period */
 #define MAGICNUM		49		/* num of devices w/sem + 1 for timer*/
 
 /* timer, timescale, TOD-LO and other bus regs */
@@ -34,8 +34,8 @@
 
 /* old processor state locations */
 #define SYSCALLOLDAREA 0x20000348
-#define PBGTRAPOLDAREA 0x20000230
-#define TBLMGMTOLDAREA 0x20000018
+#define PGMTRAPOLDAREA 0x20000230
+#define TBLMGMTOLDAREA 0x20000118
 #define INTPOLDAREA    0x20000000
 
 #define IPAREA			0x0000FF00
@@ -47,6 +47,7 @@
 #define VMON			0x02000000 /* OR to turn on virtual memory */
 #define INTON			0x08000000 /* OR to turn on interval timer */
 #define IMON			0x0000FF00 /* OR to turn on Interrupt Mask */
+#define TEON			0x08000000 /* OR to turn the local timer on */
 #define IEOFF			0xFFFFFFFB /* AND to turn off interrupts */
 #define KUOFF			0xFFFFFFF7 /* AND to turn on kernel mode */
 #define VMOFF			0xFDFFFFFF /* AND to turn off virtual memory */
