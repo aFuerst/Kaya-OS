@@ -386,12 +386,12 @@ HIDDEN void syscall8(state_PTR caller){
 	deviceNum = caller -> s_a2;
 	read = caller -> s_a3; /* terminal read / write */
 	
-	if(lineNum < 3 || lineNum > 7){
+	if(lineNum < DISKINT || lineNum > TERMINT){
 		syscall2(); /* illegal IO wait request */
 	}
 	
 	/* compute which device */
-	if(lineNum == 7 && read == TRUE){
+	if(lineNum == TERMINT && read == TRUE){
 		/* terminal read operation */
 		index = DEVPERINT * (lineNum - DEVWOSEM + read) + deviceNum;
 	} else {

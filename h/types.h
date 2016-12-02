@@ -111,4 +111,46 @@ typedef struct semd_t {
 
 } semd_t;
 
+typedef struct pteEntry_t {
+	unsigned int	entryHI;
+	unsigned int	entryLO;
+} pteEntry_t;
+
+#define KUSEGPTESIZE	32
+#define KSEGOSPTESIZE	64
+
+typedef struct pte_t {
+	int				header;
+	pteEntry_t		pteTable[KUSEGPTESIZE];
+} pte_t;
+
+typedef struct pteOS_t {
+	int 		header;
+	pteEntry_t	pteTable[KSEGOSPTESIZE];
+} pteOS_t;
+
+typedef struct segTable_t {
+	pteOS_t			*ksegOS;
+	pte_t			*kUseg2;
+	pte_t			*kUseg3;
+} segTable_t;
+
+#define TRAPTYPES		3
+typedef struct Tproc_t {
+	int			Tp_sem;
+	pte_t		Tp_pte;
+	int			Tp_backStoreAddr;
+	state_t		Tnew_trap[TRAPTYPES];
+	state_t		Told_trap[TRAPTYPES];
+} Tproc_t, *Tproc_PTR;
+
+typedef struct swapPool_t {
+	int			asid;
+	int			segNo;
+	int			pageNo;
+	pteEntry_t	*pte;
+} swapPool_t;
+
+
 #endif
+

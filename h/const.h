@@ -78,9 +78,9 @@
 #define TLBTRAP			0
 #define PROGTRAP		1
 #define SYSTRAP			2
-
+/*
 #define TRAPTYPES		3
-
+*/
 
 /* device interrupts */
 #define DISKINT			3
@@ -119,6 +119,20 @@
 #define INTBITMAP		0x1000003C
 #define INTDEVREG		0x10000050
 
+/* Page table constants */
+#define SWAPSIZE		5	/* number of swapable pages */
+/*
+#define KUSEGPTESIZE	32
+#define KSEGOSPTESIZE	64
+*/	
+#define MAXUSERPROC		1		/* number of active user processes */
+
+/* kSegOS segment information */
+#define OSPAGES		KSEGOSPTESIZE
+#define OSSIZE		(OSPAGES * PAGESIZE)
+#define KSEGOSEND 	(ROMPAGESTART + OSSIZE)
+#define PGTBLMAGICNUM	0x2A	/* Page Table Magic number */
+
 /* device common STATUS codes */
 #define UNINSTALLED		0
 #define READY			1
@@ -127,6 +141,20 @@
 /* device common COMMAND codes */
 #define RESET			0
 #define ACK				1
+#define PRINTCHR		2
+#define TRANSMITCHR		2
+#define RECVCHR			2
+
+#define CHRTRMTD		5
+#define CHRRECVD		5
+#define READBLK			3
+#define WRITEBLK		4
+#define SEEKCYL			2
+
+/* Disk data1 information */
+#define MAXCYLAREA		0xFFFF0000
+#define MAXHEADAREA		0x0000FF00
+#define MAXSECTAREA		0x000000FF
 
 /* operations */
 #define	MIN(A,B)	((A) < (B) ? A : B)
@@ -146,5 +174,16 @@
 #define GETCPUTIME 		 6
 #define WAITCLOCK 		 7
 #define WAITIO 			 8
+#define READ_FROM_TERMINAL	9
+#define WRITE_TO_TERMINAL	10
+#define V_VIRTUAL_SEMAPHORE	11
+#define P_VIRTUAL_SEMAPHORE	12
+#define DELAY				13
+#define DISK_PUT			14
+#define DISK_GET			15
+#define WRITE_TO_PRINTER	16
+#define GET_TOD				17
+#define TERMINATE			18 
 
 #endif
+
