@@ -98,23 +98,23 @@ void interruptHandler(){
 	}
 
 	else if((cause & FOURTH) != 0){ /* disk device  */
-		lineNum = 3;
+		lineNum = DISKINT;
 	}
 
 	else if((cause & FIFTH) != 0){ /* tape device */
-		lineNum = 4;
+		lineNum = TAPEINT;
 	}
 
 	else if((cause & SIXTH) != 0){ /* network device */
-		lineNum = 5;
+		lineNum = NETWINT;
 	}
 
 	else if((cause & SEVENTH) != 0){ /* printer device */
-		lineNum = 6;
+		lineNum = PRNTINT;
 	}
 
 	else if((cause & EIGHTH) != 0){ /* terminal device */
-		lineNum = 7;
+		lineNum = TERMINT;
 
 	} else {
 		/* interrupt caused for unknown reason */

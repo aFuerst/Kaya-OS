@@ -44,6 +44,7 @@ void tlbManager(){
 	state_PTR caller = (state_PTR) TBLMGMTOLDAREA;
 	PassUpOrDie(caller, TLBTRAP);
 }
+/** end tlbManager **/
 
 /************************* END TLB MANAGER MODULE *********************/
 
@@ -59,6 +60,7 @@ void pgmTrap(){
 	state_PTR caller = (state_PTR) PGMTRAPOLDAREA;
 	PassUpOrDie(caller, PROGTRAP);
 }
+/** end pgmTrap **/
 
 /************************ END PROGRAM TRAP MODULE *********************/
 
@@ -67,6 +69,14 @@ void pgmTrap(){
 
 /***********************************************************************
  * SYSCALL Handler
+ * 
+ * Handles syscalls 1-8. All other syscalls are passed up to 
+ * processes assigned syscall exception handler. If syscall 1-8 were 
+ * requested in user mode, a program trap will be issued
+ * for that process. 
+ * 
+ * How to exit from syscall handler is decided by each individual 
+ * syscall. 
  * 
 ***********************************************************************/
  void syscallHandler(){
@@ -82,16 +92,16 @@ void pgmTrap(){
 		((callerStatus & KUON) != ALLOFF)){
 		pgm = (state_PTR) PGMTRAPOLDAREA;
 		/* syscall is 1-8 and in not kernel mode */
-		/* cause a program trap */
 		copyState(caller, pgm);
 		/* set cause to privlidged instruction exception */
 		temp = (pgm -> s_cause) & ~(0xFF);
 		(pgm -> s_cause) = (temp | (10 << 2));
+		/* fake a program trap */
 		pgmTrap();
 	}
 	/* increment caller's PC to next instruction */
 	caller -> s_pc = caller -> s_pc + 4;
-	/* handle valid syscall */
+	/* handle valid syscalls */
 	switch(sysRequest){
 			case CREATEPROCESS:
 				syscall1(caller);
@@ -125,6 +135,7 @@ void pgmTrap(){
 	PANIC();
 	/* individual syscalls decide who to pass control to */
 }
+/** end syscallHandler **/
  
 /***********************************************************************
  * SYS1
@@ -159,6 +170,7 @@ HIDDEN void syscall1(state_t* caller){
 	/* return CPU to caller */
 	LDST(caller);
 }
+/** end syscall1 **/
 	
 /***********************************************************************
  * SYS2
@@ -166,7 +178,7 @@ HIDDEN void syscall1(state_t* caller){
  * Causes the executing process to cease to exist. All progeny of this
  * process are terminated as well. Execution of this instructions 
  * DOES NOT complete untill ALL progeny are terminated.
- * called by placing 2 in a0 and executing SYSCALL
+ * Control is given to scheduler after killing is completed.
 ***********************************************************************/
 HIDDEN void syscall2(){
 	if(emptyChild(currProc)){
@@ -183,6 +195,7 @@ HIDDEN void syscall2(){
 	/* call scheduler */
 	scheduler();
 }
+/** end syscall2 **/
 
 /***********************************************************************
  * Sys2Helper
@@ -199,28 +212,27 @@ HIDDEN void sys2Helper(pcb_PTR head){
 	}
 	
 	if(head -> p_semAdd != NULL){
-		/* try and remove self from ASL */
+		/* process blocked, remove self from ASL */
 		int* sem = head -> p_semAdd;
-		
-		/* debug */		
 		outBlocked(head);
 		/* check if blocked on device */
 		if(sem >= &(semD[0]) && sem <= &(semD[MAGICNUM-1])){ 
 			sftBlkCount--;
 		} else {
-			++(*(sem)); /* increment semaphore */
+			++(*sem); /* increment semaphore */
 		}
 	} else if (head == currProc) {
-		/* try and remove process from it's parent */
+		/* remove process from it's parent */
 		outChild(currProc);
 	} else {
-		/* try and remove self from readyQueue */
+		/* remove process from readyQueue */
 		outProcQ(&readyQueue, head);
 	}
 	/* free self after we have no more children */
 	freePcb(head);
 	--procCount;
 }
+/** end sys2Helper **/
 
 /***********************************************************************
  * SYS3
@@ -246,6 +258,7 @@ HIDDEN void syscall3(state_PTR caller){
 	/* always return control to caller */
 	LDST(caller);
 }
+/** end syscall3 **/
 
 /***********************************************************************
  * SYS4
@@ -253,7 +266,8 @@ HIDDEN void syscall3(state_PTR caller){
  * Perform a P operation on a semaphore. Place the value 4 in a0 and 
  * the physical address of the semaphore to be V'ed in a1
  * May or may not return control to requesting process. If the semaphpre
- * value is less than 0 process will be blocked.
+ * value is less than 0 process will be blocked and control will be 
+ * sent to the scheduler.
 ***********************************************************************/
 HIDDEN void syscall4(state_PTR caller){
 	int* semV = (int*) caller->s_a1;
@@ -267,11 +281,18 @@ HIDDEN void syscall4(state_PTR caller){
 	/* nothing had control of the sem, return control to caller */
 	LDST(caller);
 }
+/** end syscall4 **/
 
 /***********************************************************************
  * SYS5
  * Specify_Exception_State_Vector
- * does complicated tlb / PgmTrap / SYS/Bp things
+ * 
+ * Called to set up processes tlb, pgmtrp, and high level syscall 
+ * handlers. If the specified vector has not been set up, the th values
+ * in a2 and a3 will be saved as old and new state values. If the vector
+ * has already been set up then a sys2 will be issued for the offending
+ * process.
+ * 
  * Returns control to the requesting process
 ***********************************************************************/
 HIDDEN void syscall5(state_PTR caller){
@@ -305,14 +326,14 @@ HIDDEN void syscall5(state_PTR caller){
 	}
 	LDST(caller);
 }
+/** end syscall5 **/
 
 /***********************************************************************
  * SYS6
  * Get_CPU_Time
  * Causes the processor time (in microseconds) used by the requesting
- * process to be placed/returned callers v0. This means that the nucleus
- * must record (in the ProcBlk) the amount of processor time used by 
- * each process. 
+ * process to be placed/returned callers v0. 
+ * Control is then returned to the requesting process
 ***********************************************************************/
 HIDDEN void syscall6(state_PTR caller){
 	cpu_t temp;
@@ -325,13 +346,17 @@ HIDDEN void syscall6(state_PTR caller){
 	STCK(TODStarted);
 	LDST(caller);
 }
+/** end syscall6 **/
 
 /***********************************************************************
  * SYS7
  * Wait_For_Clock
  * Perform a P operation on the nucleus maintained pseudo-clock timer
- * semaphore. This semaphore is V'ed every 100 milliseconds 
+ * semaphore. This semaphore will be V'ed every 100 milliseconds 
  * automatically by the nucleus. 
+ *
+ *	Requesting process is always blocked and control will be sent to the 
+ * scheduler.
 ***********************************************************************/
 HIDDEN void syscall7(state_PTR caller){
 	/* interval timer semaphore is last in semD list */
@@ -342,6 +367,7 @@ HIDDEN void syscall7(state_PTR caller){
 	++sftBlkCount;
 	scheduler();
 }
+/** end syscall7 **/
 
 /***********************************************************************
  * SYS8
@@ -350,6 +376,8 @@ HIDDEN void syscall7(state_PTR caller){
  * Performs a P operation on the requested device semaphore
  * Line number is in a1 and device number is in a2
  * 
+ * Requesting process is always blocked and control will be sent to the 
+ * scheduler.
 ***********************************************************************/
 HIDDEN void syscall8(state_PTR caller){
 	int lineNum, deviceNum, read, index;
@@ -357,7 +385,6 @@ HIDDEN void syscall8(state_PTR caller){
 	lineNum = caller -> s_a1;
 	deviceNum = caller -> s_a2;
 	read = caller -> s_a3; /* terminal read / write */
-	/*index = 0;*/
 	
 	if(lineNum < 3 || lineNum > 7){
 		syscall2(); /* illegal IO wait request */
@@ -383,6 +410,11 @@ HIDDEN void syscall8(state_PTR caller){
 	/* EDIT */
 	LDST(caller);
 }
+/** end syscall8 **/
+
+/************************* END SYSCALL MODULE *************************/
+
+/*********************** BEGIN LOCAL FUNCTIONS ************************/
 
 /***********************************************************************
  * PassUpOrDie
@@ -424,6 +456,12 @@ HIDDEN void PassUpOrDie(state_PTR caller, int reason){
 	}
 	syscall2(); /* if no vector defined, kill process */
 }
+/** end passUpOrDie **/
+
+/************************ END LOCAL FUNCTIONS *************************/
+
+
+/*********************** BEGIN SHARED FUNCTIONS ***********************/
 
 /***********************************************************************
  * CopyState
@@ -440,5 +478,6 @@ void copyState(state_PTR src, state_PTR dest){
 		dest -> s_reg[i] = src -> s_reg[i];
 	}
 }
+/** end copyState **/
 
-/************************* END SYSCALL MODULE *************************/
+/************************ END SHARED FUNCTIONS ************************/
