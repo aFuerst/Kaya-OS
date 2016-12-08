@@ -1,14 +1,17 @@
+
 #include "../h/const.h"
 #include "../h/types.h"
-#include "/usr/local/include/umps2/umps/libumps.e"
 #include "../e/initProc.e"
 
-/* variables taken from initProc */
-extern int disk0Sem, disk1Sem;
-extern Tproc_t uProcStates[MAXUSERPROC];
+#include "/usr/local/include/umps2/umps/libumps.e"
 
+/* variables taken from initProc */
+extern int disk0Sem, disk1Sem, swapSem, masterSem;
+extern Tproc_t uProcStates[MAXUSERPROC];
+swapPool_t swapPool[SWAPSIZE];
+	
 /* function from UMPS */
-extern unsigned int getENRTYHI();
+extern unsigned int getENTRYHI(void);
 
 /***********************************************************************
  * Implements VM I/O support level SYS?Bp and PgmTrp exception handlers
@@ -27,8 +30,8 @@ HIDDEN void syscall15();
 HIDDEN void syscall16();
 HIDDEN void syscall17();
 HIDDEN void syscall18();
-HIDDEN unsigned int getASID();
-HIDDEN state_PTR getCaller(unsigned int ASID, int trapType);
+extern unsigned int getASID();
+state_PTR getCaller(unsigned int ASID, int trapType);
 
 void userSyscallHandler() {
 	/* determine which uProc is requestor */
@@ -37,7 +40,6 @@ void userSyscallHandler() {
 	unsigned int asid = getASID();/* get process ID */
 	caller = getCaller(asid, SYSTRAP);
 	
-	/*&((uProcStates[SYSTRAP]).Told_trap[asid]);
 	/* get correct sysOld area based on requesting uProc */
 	/* get requested service out of oldSys -> s_a0 */
 	sysReq = caller -> s_a0;
@@ -406,7 +408,8 @@ HIDDEN void syscall16() {
 	/* determine which uProc is requestor */	
 	unsigned int asid = getASID();/* get process ID */
 	caller = getCaller(asid, SYSTRAP);
-	
+	length = (int)caller -> s_a2;
+	string = (char*)caller -> s_a1;
 	/* get device register for specific terminal */
 	printer = (device_t *) (INTDEVREG + ((PRNTINT-DEVWOSEM)
 				* DEVREGSIZE * DEVPERINT) + ((asid-1) * DEVREGSIZE));
@@ -463,22 +466,37 @@ HIDDEN void syscall17() {
  */
 HIDDEN void syscall18() {
 	state_PTR caller;
+	int i;
 	/* determine which uProc is requestor */	
 	unsigned int asid =  getASID();/* get process ID */
-	
 	caller = getCaller(asid, SYSTRAP);
+	/* gain control of swap pool */
+	SYSCALL(PASSEREN, (int)&swapSem, 0, 0);
+
+	/* check all pages to see if we can release any */
+	for(i=0;i<SWAPSIZE;++i){
+		/* if process had pages, release them to swap pool */
+		if(swapPool[i].asid == asid){
+			swapPool[i].asid = -1;
+			swapPool[i].pageNo = -1;
+			swapPool[i].pte = NULL;
+			swapPool[i].segNo = -1;
+		}
+	}
+
+	TLBCLR();/* empty tlb after updating pages */
+	/* release control of swap pool */
+	SYSCALL(VERHOGEN, (int)&swapSem, 0, 0);
+	/* notify master process a child has ended */
+	SYSCALL(VERHOGEN, (int)&masterSem, 0, 0);	
+	/* actually end process */
+	SYSCALL(TERMINATEPROCESS, 0, 0, 0);
 }
 
 
-HIDDEN unsigned int getASID() {
-	unsigned int asid = getENRTYHI();
-	asid = (asid & 0x00000FC0) >> 6;/* get process ID */
-	return asid;
+state_PTR getCaller(unsigned int ASID, int trapType){
+	return (&((uProcStates[ASID-1]).Told_trap[trapType]));
 }
-
-HIDDEN state_PTR getCaller(unsigned int ASID, int trapType){
-	return (&((uProcStates[asid-1]).Told_trap[trapType]));
-)
 
 /***********************************************************************
  * 	User Level Program Trap Exception Handler

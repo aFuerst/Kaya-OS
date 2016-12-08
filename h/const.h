@@ -121,17 +121,37 @@
 
 /* Page table constants */
 #define SWAPSIZE		5	/* number of swapable pages */
-/*
+#define SEGSTART		0x20000500
+#define SEGWIDTH		24
 #define KUSEGPTESIZE	32
 #define KSEGOSPTESIZE	64
-*/	
+	
 #define MAXUSERPROC		1		/* number of active user processes */
+
+
+#define WELLKNOWNPCSTART		0x800000B0
+#define WELLKNOWNSTACKSTART		0xC0000000
 
 /* kSegOS segment information */
 #define OSPAGES		KSEGOSPTESIZE
 #define OSSIZE		(OSPAGES * PAGESIZE)
-#define KSEGOSEND 	(ROMPAGESTART + OSSIZE)
+#define KSEGOSEND 	(ROMPAGESTART + OSSIZE) /* bottom of last page of os */
 #define PGTBLMAGICNUM	0x2A	/* Page Table Magic number */
+#define TAPEBUFFCOUNT 	8
+#define DISKBUFFCOUNT 	8
+/* bottom of first page of disk buffers, access to other pages by adding PAGESIZE */
+#define DISKBUFFSTART	(KSEGOSEND - (DISKBUFFCOUNT * PAGESIZE))
+/* bottom of first page of tape buffers, access to other pages by adding PAGESIZE */
+#define TAPEBUFFSTART	(DISKBUFFSTART - ((TAPEBUFFCOUNT * PAGESIZE) + (DISKBUFFCOUNT * PAGESIZE)))
+
+/* Page Table Bit Locations */
+#define DIRTYON		0x00000400
+#define VALIDON		0x00000200
+#define GLOBALON	0x00000100
+
+/* shifts */
+#define	ASIDSHIFT	6
+#define ENTRYHISHIFT 12
 
 /* device common STATUS codes */
 #define UNINSTALLED		0
@@ -151,6 +171,12 @@
 #define WRITEBLK		4
 #define SEEKCYL			2
 
+#define EOT			0
+#define EOF			1
+#define EOB			2
+#define TS			3
+#define READBLK		3
+
 /* Disk data1 information */
 #define MAXCYLAREA		0xFFFF0000
 #define MAXHEADAREA		0x0000FF00
@@ -163,7 +189,7 @@
 
 /* Useful operations */
 #define STCK(T) ((T) = ((* ((cpu_t *) TODLOADDR)) / (* ((cpu_t *) TIMESCALEADDR))))
-#define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR))) 
+#define LDIT(T)	((* ((cpu_t *) INTERVALTMR)) = (T) * (* ((cpu_t *) TIMESCALEADDR)))
 
 /* SYSCALL values */
 #define CREATEPROCESS 	 1
@@ -183,6 +209,7 @@
 #define DISK_GET			15
 #define WRITE_TO_PRINTER	16
 #define GET_TOD				17
+#define GETTIME				GET_TOD
 #define TERMINATE			18 
 
 #endif

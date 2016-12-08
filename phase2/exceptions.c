@@ -288,7 +288,7 @@ HIDDEN void syscall4(state_PTR caller){
  * Specify_Exception_State_Vector
  * 
  * Called to set up processes tlb, pgmtrp, and high level syscall 
- * handlers. If the specified vector has not been set up, the th values
+ * handlers. If the specified vector has not been set up, then the values
  * in a2 and a3 will be saved as old and new state values. If the vector
  * has already been set up then a sys2 will be issued for the offending
  * process.
