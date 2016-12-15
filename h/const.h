@@ -120,14 +120,18 @@
 #define INTDEVREG		0x10000050
 
 /* Page table constants */
-#define SWAPSIZE		5	/* number of swapable pages */
+#define MAXUSERPROC		5		/* number of active user processes */
+#define SWAPSIZE		3 * MAXUSERPROC	/* number of swapable pages */
 #define SEGSTART		0x20000500
-#define SEGWIDTH		24
+#define SEGWIDTH		12
 #define KUSEGPTESIZE	32
 #define KSEGOSPTESIZE	64
-	
-#define MAXUSERPROC		1		/* number of active user processes */
 
+#define TLBL			2
+#define TLBS			3
+#define MOD				1
+#define ADEL			4
+#define ades			5
 
 #define WELLKNOWNPCSTART		0x800000B0
 #define WELLKNOWNSTACKSTART		0xC0000000
@@ -142,7 +146,7 @@
 /* bottom of first page of disk buffers, access to other pages by adding PAGESIZE */
 #define DISKBUFFSTART	(KSEGOSEND - (DISKBUFFCOUNT * PAGESIZE))
 /* bottom of first page of tape buffers, access to other pages by adding PAGESIZE */
-#define TAPEBUFFSTART	(DISKBUFFSTART - ((TAPEBUFFCOUNT * PAGESIZE) + (DISKBUFFCOUNT * PAGESIZE)))
+#define TAPEBUFFSTART	(KSEGOSEND - (((DISKBUFFCOUNT + TAPEBUFFCOUNT) * PAGESIZE)))
 
 /* Page Table Bit Locations */
 #define DIRTYON		0x00000400

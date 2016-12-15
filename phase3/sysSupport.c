@@ -7,11 +7,15 @@
 
 /* variables taken from initProc */
 extern int disk0Sem, disk1Sem, swapSem, masterSem;
-extern Tproc_t uProcStates[MAXUSERPROC];
-swapPool_t swapPool[SWAPSIZE];
+extern Tproc_t uProcs[MAXUSERPROC];
+extern swapPool_t swapPool[SWAPSIZE];
 	
 /* function from UMPS */
 extern unsigned int getENTRYHI(void);
+extern unsigned int getASID();
+extern void diskIO(int sector, int cylinder, int head, int* semaphore, int disk, int pageLoc, int rw);
+extern state_PTR getCaller(unsigned int ASID, int trapType);
+
 
 /***********************************************************************
  * Implements VM I/O support level SYS?Bp and PgmTrp exception handlers
@@ -103,7 +107,7 @@ HIDDEN void syscall9(){
 	state_PTR caller;
 	int i;
 	char recvdVal;
-	unsigned int status;
+	unsigned int status, myStatus;
 	char* string;
 	device_t* terminal; /* terminal device register location */
 
@@ -122,18 +126,26 @@ HIDDEN void syscall9(){
 	}
 	i=0;
 	do {
+		/* turn off interrupts */
+		myStatus = getSTATUS();
+		setSTATUS(ALLOFF);
+		
 		terminal -> t_recv_command = RECVCHR;
 		/* make call to waitIO after issuing IO request*/
 		status = SYSCALL(WAITIO, TERMINT, asid-1, TRUE);
-		if((status & 0xFF) != CHRRECVD) {
+		
+		/* turn back on interrupts*/
+		setSTATUS(myStatus);
+		
+		if((status & 0x000000FF) != CHRRECVD) {
 			/* error in printing */
 			/* negate i for placing in callers v0 */
 			i = i * -1;
 			/* exit print loop */
 			break;
 		}
-		recvdVal = status & 0xFF00;
-		string[i] = (recvdVal >> 8);
+		recvdVal = (status & 0x0000FF00) >> 8;
+		string[i] = recvdVal;
 		++i;
 	} while(recvdVal != '\0'); /* loop until EOF */
 	
@@ -161,7 +173,7 @@ HIDDEN void syscall9(){
 HIDDEN void syscall10(){
 	state_PTR caller;
 	int i,length;
-	unsigned int status, command;
+	unsigned int status, command, myStatus;
 	char* string;
 	device_t* terminal; /* terminal device register location */
 	
@@ -182,13 +194,23 @@ HIDDEN void syscall10(){
 	if(string <= (char*)KSEGOSEND) {
 		syscall18();
 	}
+	
 	for(i=0; i < length; ++i) {
 		command = string[i];
 		command = command << 8;
 		command = command | TRANSMITCHR;
+		
+		/* turn off interrupts */
+		myStatus = getSTATUS();
+		setSTATUS(ALLOFF);
+		
 		terminal -> t_transm_command = command;
 		/* make call to waitIO after issuing IO request*/
 		status = SYSCALL(WAITIO, TERMINT, asid-1, FALSE);
+		
+		/* turn back on interrupts*/
+		setSTATUS(myStatus);
+		
 		if((status & 0xFF) != CHRTRMTD) {
 			/* error in printing */
 			/* negate i for placing in callers v0 */
@@ -249,14 +271,18 @@ HIDDEN void syscall14() {
 	state_PTR caller;
 	device_t* disk;
 	int maxCyl, maxSect, maxHead, sectNum, cylinder, surface, track;
-	unsigned int command, status;
 	
 	/* determine which uProc is requestor */	
 	unsigned int asid =  getASID();/* get process ID */
 	
 	caller = getCaller(asid, SYSTRAP);
+	
+	if(caller -> s_a1 <= KSEGOSEND){
+		syscall18();
+	}
+	
 	/* check if a1 != 0, if so terminate */
-	if(caller -> s_a0 == 0){
+	if(caller -> s_a2 == 0){
 		syscall18();
 	}
 	
@@ -281,7 +307,10 @@ HIDDEN void syscall14() {
 	/* cylinder */
 	cylinder = sectNum % maxCyl;
 
+	diskIO(cylinder, track, surface, &disk1Sem, 1, (int)caller -> s_a1, WRITEBLK);
+
 	/* do disk seek based on this info */
+	/*
 	command = cylinder << 8;
 	command = command | SEEKCYL;
 	
@@ -296,6 +325,7 @@ HIDDEN void syscall14() {
 	command = (command << 8) | WRITEBLK;
 	
 	/* perform actual write */
+	/*
 	disk->d_data0 = (int)caller -> s_a1;
 	disk->d_command = command;
 	status = SYSCALL(WAITIO, DISKINT, asid-1, 0);
@@ -325,15 +355,18 @@ HIDDEN void syscall15() {
 	state_PTR caller;
 	device_t* disk;
 	int sectNum, cylinder, surface, track, maxCyl, maxSect, maxHead;
-	unsigned int command, status;
 	
 	/* determine which uProc is requestor */	
 	unsigned int asid =  getASID();/* get process ID */
 	
 	caller = getCaller(asid, SYSTRAP);
 	
-	/* check if a1 != 0, if so terminate */
-	if(caller -> s_a1 == 0) {
+	if(caller -> s_a1 <= KSEGOSEND){
+		syscall18();
+	}
+	
+	/* check if a1 == 0, if so terminate */
+	if(caller -> s_a2 == 0) {
 		syscall18();
 	}
 	
@@ -356,8 +389,10 @@ HIDDEN void syscall15() {
 	/* cylinder */
 	cylinder = sectNum % maxCyl;
 		
+	diskIO(cylinder, track, surface, &disk1Sem, 1, (int)caller -> s_a1, WRITEBLK);
+	
 	/* do disk seek based on this info */
-	command = cylinder << 8;
+	/*command = cylinder << 8;
 	command = command | SEEKCYL;
 	
 	SYSCALL(PASSEREN,(int)(&disk1Sem),0,0);
@@ -370,7 +405,7 @@ HIDDEN void syscall15() {
 	command = (command << 8) | track;
 	command = (command << 8) | READBLK;
 	
-	/* perform actual write */
+	/* perform actual write *//*
 	disk->d_data0 = (int)caller -> s_a1;
 	disk->d_command = command;
 	status = SYSCALL(WAITIO, DISKINT, asid-1,0);
@@ -448,10 +483,12 @@ HIDDEN void syscall16() {
 HIDDEN void syscall17() {
 	state_PTR caller;
 	cpu_t time;
+	
 	/* determine which uProc is requestor */	
 	unsigned int asid =  getASID();/* get process ID */
 	caller = getCaller(asid, SYSTRAP);
 	STCK(time);
+	
 	/* store time in caller's v0, and ldst to caller */
 	caller -> s_v0 = time;
 	LDST(caller);
@@ -478,9 +515,9 @@ HIDDEN void syscall18() {
 		/* if process had pages, release them to swap pool */
 		if(swapPool[i].asid == asid){
 			swapPool[i].asid = -1;
-			swapPool[i].pageNo = -1;
+			swapPool[i].pageNo = 0;
 			swapPool[i].pte = NULL;
-			swapPool[i].segNo = -1;
+			swapPool[i].segNo = 0;
 		}
 	}
 
@@ -494,16 +531,12 @@ HIDDEN void syscall18() {
 }
 
 
-state_PTR getCaller(unsigned int ASID, int trapType){
-	return (&((uProcStates[ASID-1]).Told_trap[trapType]));
-}
-
 /***********************************************************************
  * 	User Level Program Trap Exception Handler
  * 
 ***********************************************************************/
 
 void userPgmTrpHandler() {
-	syscall18();
+	SYSCALL(TERMINATE, 0, 0, 0);
 }
 
